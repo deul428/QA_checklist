@@ -14,3 +14,5 @@ ENV/
 user_passwords.json
 user.csv
 example.csv
+
+.history
