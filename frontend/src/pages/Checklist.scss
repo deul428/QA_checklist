@@ -115,8 +115,12 @@
   @include input-base;
   width: 100%;
   resize: vertical;
+  margin-top: 0;
   min-height: 80px;
+  border: 1px solid $border-light;
+  padding-bottom: 0.5rem;
 }
+
 
 // 제출 섹션
 .submit-section {

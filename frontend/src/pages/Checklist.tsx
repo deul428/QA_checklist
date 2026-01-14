@@ -47,7 +47,10 @@ const Checklist: React.FC = () => {
         setNotes(initialNotes);
       } catch (error) {
         console.error("데이터 로딩 실패:", error);
-        setMessage({ type: "error", text: "데이터를 불러오는 데 실패했습니다. QA혁신팀 김희수 사원에게 문의하세요." });
+        setMessage({
+          type: "error",
+          text: "데이터를 불러오는 데 실패했습니다. QA혁신팀 김희수 사원에게 문의하세요.",
+        });
       } finally {
         setLoading(false);
       }
@@ -84,6 +87,21 @@ const Checklist: React.FC = () => {
       return;
     }
 
+    // FAIL 선택 항목 중 사유가 없는 항목 확인
+    const failItemsWithoutReason = checkItems.filter(
+      (item) =>
+        checklistData[item.id] === "FAIL" &&
+        (!notes[item.id] || notes[item.id].trim() === "")
+    );
+
+    if (failItemsWithoutReason.length > 0) {
+      setMessage({
+        type: "error",
+        text: `FAIL 선택 항목에 사유를 입력해 주세요. (${failItemsWithoutReason.length}개 미입력)`,
+      });
+      return;
+    }
+
     setSubmitting(true);
     setMessage(null);
 
@@ -95,13 +113,15 @@ const Checklist: React.FC = () => {
       }));
 
       await checklistAPI.submitChecklist(submitItems);
-      
+
       // 저장 성공 후 대시보드로 이동
       navigate("/dashboard");
     } catch (error: any) {
       setMessage({
         type: "error",
-        text: error.response?.data?.detail || "저장에 실패했습니다. QA혁신팀 김희수 사원에게 문의하세요.",
+        text:
+          error.response?.data?.detail ||
+          "저장에 실패했습니다. QA혁신팀 김희수 사원에게 문의하세요.",
       });
     } finally {
       setSubmitting(false);
@@ -111,6 +131,7 @@ const Checklist: React.FC = () => {
   if (loading) {
     return <div className="loading">로딩 중...</div>;
   }
+  console.log(checklistData);
 
   return (
     <div className="checklist-page">
@@ -136,38 +157,50 @@ const Checklist: React.FC = () => {
             <>
               <div className="check-item-container">
                 {checkItems.map((item, index) => (
-                  <div key={item.id} className="check-item">
-                    <div className="check-item-header">
-                      <span className="item-number">{index + 1}</span>
-                      <h4>{item.item_name}</h4>
-                    </div>
-                    <div className="item-description">
-                      <p>{item.description}</p>
-                    </div>
-                    <div className="check-item-actions">
-                      <div className="status-buttons">
-                        <button
-                          className={`status-btn ${
-                            checklistData[item.id] === "PASS"
-                              ? "active pass"
-                              : ""
-                          }`}
-                          onClick={() => handleStatusChange(item.id, "PASS")}
-                        >
-                          PASS
-                        </button>
-                        <button
-                          className={`status-btn ${
-                            checklistData[item.id] === "FAIL"
-                              ? "active fail"
-                              : ""
-                          }`}
-                          onClick={() => handleStatusChange(item.id, "FAIL")}
-                        >
-                          FAIL
-                        </button>
+                  <>
+                    <div
+                      key={item.id}
+                      className="check-item"
+                      style={{
+                        borderBottom:
+                          checklistData[item.id] === "FAIL"
+                            ? "1px solid transparent"
+                            : "1px solid #e8ddd4",
+                        paddingBottom:
+                          checklistData[item.id] === "FAIL" ? "0" : "0.5rem",
+                      }}
+                    >
+                      <div className="check-item-header">
+                        <span className="item-number">{index + 1}</span>
+                        <h4>{item.item_name}</h4>
                       </div>
-                      {/* <textarea
+                      <div className="item-description">
+                        <p>{item.description}</p>
+                      </div>
+                      <div className="check-item-actions">
+                        <div className="status-buttons">
+                          <button
+                            className={`status-btn ${
+                              checklistData[item.id] === "PASS"
+                                ? "active pass"
+                                : ""
+                            }`}
+                            onClick={() => handleStatusChange(item.id, "PASS")}
+                          >
+                            PASS
+                          </button>
+                          <button
+                            className={`status-btn ${
+                              checklistData[item.id] === "FAIL"
+                                ? "active fail"
+                                : ""
+                            }`}
+                            onClick={() => handleStatusChange(item.id, "FAIL")}
+                          >
+                            FAIL
+                          </button>
+                        </div>
+                        {/* <textarea
                         className="notes-input"
                         placeholder="특이사항이나 메모를 입력하세요 (선택사항)"
                         value={notes[item.id] || ""}
@@ -175,8 +208,28 @@ const Checklist: React.FC = () => {
                           handleNoteChange(item.id, e.target.value)
                         }
                       /> */}
+                      </div>
                     </div>
-                  </div>
+                    {checklistData[item.id] === "FAIL" && (
+                      <>
+                        <textarea
+                          className="notes-input"
+                          placeholder="FAIL 사유를 입력하세요. (필수)"
+                          value={notes[item.id] || ""}
+                          onChange={(e) =>
+                            handleNoteChange(item.id, e.target.value)
+                          }
+                        />
+                        <div
+                          className="notes-input-footer"
+                          style={{
+                            display: "flex",
+                            borderTop: "1px solid #e8ddd4", 
+                          }}
+                        ></div>
+                      </>
+                    )}
+                  </>
                 ))}
               </div>
 
