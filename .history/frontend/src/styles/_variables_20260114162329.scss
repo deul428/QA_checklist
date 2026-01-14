@@ -1,0 +1,53 @@
+// 색상 변수
+$primary-color: #007bff;
+$primary-hover: #0056b3;
+$secondary-color: #333;
+$secondary-hover: #545b62;
+$success-color: #28a745;
+$success-hover: #218838;
+$danger-color: #dc3545;
+$danger-hover: #c82333;
+$warning-color: #ffc107;
+$warning-bg: #fff3cd;
+$warning-text: #856404;
+
+// 텍스트 색상
+$text-primary: #333;
+$text-secondary: #666;
+$text-muted: #999;
+
+// 배경 색상
+$bg-primary: #f8f8f8;
+$bg-white: #ffffff;
+
+// 테두리 색상
+$border-color: #ddd;
+$border-light: #e0e0e0;
+
+// 그림자
+$shadow-md: 0 2px 4px rgba(0, 0, 0, 0.1);
+$shadow-md: 0 4px 8px rgba(0, 0, 0, 0.05);
+$shadow-lg: 0 10px 40px rgba(0, 0, 0, 0.2);
+
+// 간격
+$spacing-xs: 8px;
+$spacing-sm: 12px;
+$spacing-md: 20px;
+$spacing-lg: 30px;
+$spacing-xl: 40px;
+
+// 폰트 크기
+$font-size-xs: 12px;
+$font-size-sm: 14px;
+$font-size-base: 16px;
+$font-size-lg: 18px;
+$font-size-xl: 20px;
+$font-size-xxl: 24px;
+
+// 테두리 반경
+$border-radius-sm: 4px;
+$border-radius-md: 8px;
+$border-radius-lg: 12px;
+
+// 전환 효과
+$transition-base: 0.2s;

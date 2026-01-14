@@ -1,0 +1,125 @@
+@import "../styles/variables";
+@import "../styles/mixins";
+
+.checklist-page {
+  min-height: 100vh;
+  background-color: $bg-primary;
+  padding-bottom: $spacing-xl;
+}
+
+// 헤더
+.checklist-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: $spacing-md;
+  margin-bottom: $spacing-md;
+
+  h1 {
+    color: $primary-color;
+    font-size: $font-size-xxl;
+    margin: 0;
+    font-weight: 600;
+  }
+}
+
+// 체크 항목 컨테이너 (card 안에 있음)
+.card {
+  .check-item-container {
+    width: 100%;
+    display: grid;
+    // grid-template-columns: repeat(3, 1fr);
+    gap: 0.5rem;
+  }
+}
+
+// 체크 항목
+.check-item {
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid $border-light;
+  display: flex;
+  // gap: 0 1rem;
+  justify-content: space-between;
+  align-items: center;
+
+  // 체크 항목 헤더
+  .check-item-header {
+    display: flex;
+    align-items: center;
+    width: 40%;
+    gap: $spacing-sm;
+
+    h4 {
+      color: $text-primary;
+      white-space: pre-wrap;
+      margin: 0;
+    }
+  }
+  .item-description {
+    display: flex;
+    align-items: center;
+    width: 40%;
+    // height: 40px;
+    color: $text-secondary;
+    font-size: $font-size-sm;
+  }
+  // 체크 항목 액션
+  .check-item-actions {
+    // 상태 버튼 (check-item-actions 안에 있음)
+    .status-buttons {
+      display: flex;
+      .status-btn {
+        flex: 1;
+        font-size: $font-size-sm;
+        padding: 0.5rem $spacing-sm;
+        border: none;
+        background: $bg-white;
+        cursor: pointer;
+        font-weight: 500;
+        transition: all $transition-base;
+
+        &.pass.active {
+          background-color: $success-color;
+          color: $text-on-primary;
+          border-color: $success-color;
+        }
+
+        &.fail.active {
+          background-color: $danger-color;
+          color: $text-on-primary;
+          border-color: $danger-color;
+        }
+
+        &:hover:not(.active) {
+          border-color: $primary-color;
+          background-color: $bg-light;
+        }
+      }
+    }
+  }
+}
+.item-number {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  // background-color: $primary-color;
+  color: $primary-color;
+  // border-radius: 50%;
+  font-weight: bold;
+  font-size: $font-size-sm;
+  flex-shrink: 0;
+}
+
+// 메모 입력 (check-item-actions 안에 있음)
+.notes-input {
+  @include input-base;
+  width: 100%;
+  resize: vertical;
+  min-height: 80px;
+}
+
+// 제출 섹션
+.submit-section {
+  padding-top: $spacing-md;
+  text-align: center;
+}

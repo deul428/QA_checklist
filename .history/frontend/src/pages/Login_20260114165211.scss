@@ -1,0 +1,45 @@
+@import "../styles/variables";
+@import "../styles/mixins";
+
+.login-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 100vh;
+  background: linear-gradient(135deg, $accent-color 0%, $primary-light 20%);
+}
+
+.login-card {
+  background: $bg-white;
+  border-radius: $border-radius-lg;
+  padding: $spacing-xl;
+  width: 100%;
+  max-width: 400px;
+  box-shadow: 0 8px 32px rgba(56, 137, 172, 0.2);
+  border: 1px solid rgba(236, 221, 200, 0.3);
+
+  h1 {
+    text-align: center;
+    color: $primary-color;
+    margin-bottom: 10px;
+    font-size: $font-size-xxl;
+    font-weight: 600;
+  }
+
+  h2 {
+    text-align: center;
+    color: $text-secondary;
+    margin-bottom: $spacing-lg;
+    font-size: $font-size-lg;
+    font-weight: normal;
+  }
+}
+
+.form-group {
+  margin-bottom: $spacing-md;
+}
+
+.error-message {
+  @include alert(#f8d7da, #f5c6cb, #721c24);
+  margin-bottom: 15px;
+}

@@ -1,0 +1,63 @@
+@import './variables';
+
+// 버튼 기본 스타일 믹스인
+@mixin button-base {
+  padding: 10px 20px;
+  border: none;
+  border-radius: $border-radius-sm;
+  cursor: pointer;
+  font-size: $font-size-sm;
+  transition: background-color $transition-base;
+  font-weight: 500;
+
+  &:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+}
+
+// 버튼 색상 변형 믹스인
+@mixin button-variant($bg-color, $hover-color) {
+  background-color: $bg-color;
+  color: white;
+
+  &:hover:not(:disabled) {
+    background-color: $hover-color;
+  }
+}
+
+// 카드 스타일 믹스인
+@mixin card {
+  background: $bg-white;
+  border-radius: $border-radius-md;
+  padding: 24px;
+  box-shadow: $shadow-md;
+}
+
+// 입력 필드 스타일 믹스인
+@mixin input-base {
+  width: 100%;
+  padding: 10px;
+  border: 1px solid $border-color;
+  border-radius: $border-radius-sm;
+  font-size: $font-size-sm;
+  font-family: inherit;
+  background-color: $bg-white;
+
+  &:focus {
+    outline: none;
+    border-color: $primary-color;
+    box-shadow: 0 0 0 3px rgba(56, 137, 172, 0.1);
+  }
+}
+
+// 알림 스타일 믹스인
+@mixin alert($bg-color, $border-color, $text-color) {
+  padding: 15px 20px;
+  border-radius: $border-radius-md;
+  margin-bottom: $spacing-md;
+  background-color: $bg-color;
+  border: 1px solid $border-color;
+  color: $text-color;
+}
+

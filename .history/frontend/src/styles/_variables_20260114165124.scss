@@ -1,0 +1,59 @@
+// 메인 컬러 팔레트
+$primary-color: #3889AC;        // 메인 블루
+$primary-hover: #2d6f8a;        // 호버 시 어두운 블루
+$primary-light: #5ba3c4;        // 밝은 블루
+$accent-color: #f6e7d3;          // 베이지/크림
+
+// 보조 색상
+$secondary-color: #3889AC;
+$secondary-hover: #2d6f8a;
+$success-color: #28a745;
+$success-hover: #218838;
+$danger-color: #dc3545;
+$danger-hover: #c82333;
+$warning-color: #ffc107;
+$warning-bg: #fff3cd;
+$warning-text: #856404;
+
+// 텍스트 색상
+$text-primary: #2c3e50;         // 어두운 블루-그레이
+$text-secondary: #5a6c7d;       // 중간 그레이
+$text-muted: #8a9ba8;           // 연한 그레이
+$text-on-primary: #ffffff;      // 메인 컬러 위 텍스트
+
+// 배경 색상
+$bg-primary: #ECDDC8;            // 베이지 배경
+$bg-white: #ffffff;
+$bg-light: #f5f0eb;              // 연한 베이지
+
+// 테두리 색상
+$border-color: #d4c4b8;          // 베이지 계열 테두리
+$border-light: #e8ddd4;          // 연한 베이지 테두리
+
+// 그림자
+$shadow-md: 0 2px 4px rgba(0, 0, 0, 0.1);
+$shadow-md: 0 4px 8px rgba(0, 0, 0, 0.05);
+$shadow-lg: 0 10px 40px rgba(0, 0, 0, 0.2);
+
+// 간격
+$spacing-xs: 8px;
+$spacing-sm: 12px;
+$spacing-md: 20px;
+$spacing-lg: 30px;
+$spacing-xl: 40px;
+
+// 폰트 크기
+$font-size-xs: 12px;
+$font-size-sm: 14px;
+$font-size-base: 16px;
+$font-size-lg: 18px;
+$font-size-xl: 20px;
+$font-size-xxl: 24px;
+
+// 테두리 반경
+$border-radius-sm: 4px;
+$border-radius-md: 8px;
+$border-radius-lg: 12px;
+
+// 전환 효과
+$transition-base: 0.2s;
