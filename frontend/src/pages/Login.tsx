@@ -20,7 +20,7 @@ const Login: React.FC = () => {
       await login(employeeId, password);
       navigate('/dashboard');
     } catch (err: any) {
-      setError(err.message || '로그인에 실패했습니다.');
+      setError(err.message || '로그인에 실패했습니다');
     } finally {
       setLoading(false);
     }
@@ -29,7 +29,7 @@ const Login: React.FC = () => {
   return (
     <div className="login-container">
       <div className="login-card">
-        <h1>DX본부 시스템 체크리스트</h1>
+        <h1>QA 체크리스트 시스템</h1>
         <h2>로그인</h2>
         <form onSubmit={handleSubmit}>
           <div className="form-group">

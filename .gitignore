@@ -1,0 +1,48 @@
+
+.history
+
+
+# frontend 
+# dependencies
+frontend/node_modules   
+frontend/.pnp
+frontend/.pnp.js
+
+# testing
+frontend/coverage
+
+# production
+frontend/build
+
+# misc
+frontend/.DS_Store
+frontend/.env.local
+frontend/.env.development.local
+frontend/.env.test.local
+frontend/.env.production.local
+
+frontend/npm-debug.log*
+frontend/yarn-debug.log*
+frontend/yarn-error.log*
+
+
+# backend
+backend/__pycache__/
+*.py[cod]
+backend/*.py[cod]
+backend/*$py.class
+backend/*.so
+backend/.Python
+backend/venv/
+backend/env/
+backend/ENV/
+backend/.venv
+backend/*.db
+backend/*.sqlite3
+backend/.env
+backend/*.log
+
+# database
+database/user_passwords.json
+database/user.csv
+database/example.csv 
