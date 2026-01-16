@@ -296,28 +296,28 @@ const Console: React.FC = () => {
               <div className="quick-date-buttons">
                 <button
                   type="button"
-                  className="btn btn-secondary btn-quick-date"
+                  className="btn btn-light btn-quick-date"
                   onClick={() => handleQuickDateSelect("today")}
                 >
                   오늘
                 </button>
                 <button
                   type="button"
-                  className="btn btn-secondary btn-quick-date"
+                  className="btn btn-light btn-quick-date"
                   onClick={() => handleQuickDateSelect("week")}
                 >
                   이번 주
                 </button>
                 <button
                   type="button"
-                  className="btn btn-secondary btn-quick-date"
+                  className="btn btn-light btn-quick-date"
                   onClick={() => handleQuickDateSelect("month")}
                 >
                   이번 달
                 </button>
                 <button
                   type="button"
-                  className="btn btn-secondary btn-quick-date"
+                  className="btn btn-light btn-quick-date"
                   onClick={() => handleQuickDateSelect("year")}
                 >
                   이번 년
@@ -368,7 +368,7 @@ const Console: React.FC = () => {
               </div>
               <button
                 onClick={handleTestEmailSendNow}
-                className="btn btn-light"
+                className="btn btn-dark"
                 disabled={sendingTestEmail}
               >
                 {sendingTestEmail ? "발송 중..." : "미점검 메일 발송"}
@@ -470,9 +470,9 @@ const Console: React.FC = () => {
                       <td>{formatDateTime(item.fail_time)}</td>
                       <td>
                         {item.is_resolved ? (
-                          <span className="status-badge resolved">해결됨</span>
+                          <span className="btn status-badge resolved">해결됨</span>
                         ) : (
-                          <span className="status-badge pending">미해결</span>
+                          <span className="btn status-badge pending">미해결</span>
                         )}
                       </td>
                       <td>

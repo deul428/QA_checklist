@@ -32,9 +32,12 @@ QA_checklist/
 ```bash 
 cd E:\dev\projects\venv
 python -m venv qa_checklist
-E:\dev\projects\venv\qa_checklist\Scripts\activate
 cd E:\dev\projects\QA_checklist\backend\src
 pip install -r requirements.txt
+
+
+E:\dev\projects\venv\qa_checklist\Scripts\activate
+cd E:\dev\projects\QA_checklist\backend\src
 uvicorn main:app --reload --host 0.0.0.0 --port 8003
 ```
 
@@ -43,7 +46,11 @@ uvicorn main:app --reload --host 0.0.0.0 --port 8003
 ```bash
 cd E:\dev\projects\QA_checklist\frontend
 npm install
-npm start
+
+
+cd E:\dev\projects\QA_checklist\frontend
+set PORT=3003 && npm start 
+
 ```
 
 ### 데이터베이스 설정

@@ -53,7 +53,8 @@ h3 {
   }
   &-light {
     @include button-variant($light-color, $text-dark, $light-hover);
-    box-shadow: $shadow-md;
+    // box-shadow: $shadow-sm;
+    border: 1px solid $light-hover;
   }
 
   &-success {
