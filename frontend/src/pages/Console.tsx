@@ -29,20 +29,22 @@ const Console: React.FC = () => {
   const year = today.getFullYear();
   const month = String(today.getMonth() + 1).padStart(2, "0");
   const day = String(today.getDate()).padStart(2, "0");
-  const todayStr = `${year}-${month}-${day}`; 
+  const todayStr = `${year}-${month}-${day}`;
 
   const [startDate, setStartDate] = useState<string>(todayStr);
   const [endDate, setEndDate] = useState<string>(todayStr);
   const [downloading, setDownloading] = useState(false);
 
   // 퀵 날짜 선택 함수
-  const handleQuickDateSelect = (range: "today" | "week" | "month" | "year") => {
+  const handleQuickDateSelect = (
+    range: "today" | "week" | "month" | "year"
+  ) => {
     const now = new Date();
     now.setHours(0, 0, 0, 0);
-    
+
     let start = new Date(now);
     let end = new Date(now);
-    
+
     if (range === "today") {
       // 오늘
       start = new Date(now);
@@ -62,14 +64,14 @@ const Console: React.FC = () => {
       start = new Date(now.getFullYear(), 0, 1);
       end = new Date(now);
     }
-    
+
     const formatDate = (date: Date): string => {
       const year = date.getFullYear();
       const month = String(date.getMonth() + 1).padStart(2, "0");
       const day = String(date.getDate()).padStart(2, "0");
       return `${year}-${month}-${day}`;
     };
-    
+
     setStartDate(formatDate(start));
     setEndDate(formatDate(end));
   };
@@ -290,7 +292,7 @@ const Console: React.FC = () => {
         <section className="btn-area">
           {/* 엑셀 다운로드 섹션 */}
           <div className="excel-export-section">
-            <div className="date-range-selector"> 
+            <div className="date-range-selector">
               <div className="quick-date-buttons">
                 <button
                   type="button"

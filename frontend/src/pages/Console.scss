@@ -5,8 +5,8 @@
 
 section {
   border-top: 1px solid $border-color;
-  padding-top: $spacing-lg;
-  margin-top: $spacing-lg;
+  padding-top: $spacing-md;
+  margin-top: $spacing-md;
   &:first-child {
     border-top: none;
     padding-top: 0;
@@ -31,17 +31,17 @@ section.btn-area {
   flex-direction: row;
   gap: $spacing-lg;
   width: 100%;
-  justify-content: space-between;
+  justify-content: space-between; 
 
   .excel-export-section {
     display: flex;
+    align-items: flex-end;
     flex-direction: row;
     gap: $spacing-sm;
-    .date-range-selector {
+    .date-range-selector { 
       display: flex;
       flex-direction: column;
-      gap: $spacing-sm;
-
+      gap: $spacing-xs;
       label {
         font-size: $font-size-xs;
         font-weight: 500;
@@ -51,11 +51,17 @@ section.btn-area {
       }
 
       .quick-date-buttons {
-        display: flex;
-        gap: $spacing-xs;
+        display: grid;
+        width: 300px;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 0.25rem;
 
-        .btn-quick-date { 
-          cursor: pointer;  
+        .btn-quick-date {
+          cursor: pointer;
+          width: auto;
+          font-size: $font-size-xs;
+          padding: 0.125rem 0;
+          border-radius: 2rem;
         }
       }
 
@@ -63,14 +69,18 @@ section.btn-area {
         display: flex;
         align-items: center;
         gap: 0.25rem;
+        width: 300px;
 
         .date-input {
-          padding: $spacing-xs $spacing-sm;
+          padding: $spacing-xs $spacing-xs;
           border: 1px solid $border-color;
           border-radius: 4px;
           font-size: $font-size-sm;
         }
       }
+    }
+    .btn.btn-success {
+      height: 40px;
     }
   }
 
