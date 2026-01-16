@@ -2,7 +2,7 @@
 user copy.csv 파일을 데이터베이스에 import하는 스크립트
 
 사용법:
-    python backend/dummy/import_user_copy_csv.py
+    python backend/src/utils/import_user_copy_csv.py
 """
 import sys
 import os
@@ -10,7 +10,7 @@ import csv
 from pathlib import Path
 
 # 프로젝트 루트를 Python 경로에 추가
-project_root = Path(__file__).parent.parent.parent
+project_root = Path(__file__).parent.parent.parent.parent
 sys.path.insert(0, str(project_root))
 sys.path.insert(0, str(project_root / "backend" / "src"))
 

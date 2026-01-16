@@ -64,7 +64,7 @@ h3 {
     @include button-variant($danger-color, $text-white, $danger-hover);
   }
   &-accent {
-    @include button-variant($accent-color, #3889ac, $accent-light);
+    @include button-variant($accent-color, $primary-color, $accent-light);
   }
 
   &-block {

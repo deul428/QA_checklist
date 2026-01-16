@@ -4,15 +4,15 @@ users 테이블 이메일 복구 스크립트
 백업 테이블에서 원래 이메일 주소를 복구합니다.
 
 사용법:
-    python backend/dummy/restore_user_emails.py [백업_테이블명]
+    python backend/src/utils/restore_user_emails.py [백업_테이블명]
     
 예시:
-    python backend/dummy/restore_user_emails.py users_backup_20260115_143000
+    python backend/src/utils/restore_user_emails.py users_backup_20260115_143000
 """
 import sys
 from pathlib import Path
 
-project_root = Path(__file__).parent.parent.parent
+project_root = Path(__file__).parent.parent.parent.parent
 sys.path.insert(0, str(project_root))
 sys.path.insert(0, str(project_root / "backend" / "src"))
 
@@ -144,7 +144,7 @@ def restore_emails(backup_table_name):
 
 if __name__ == "__main__":
     if len(sys.argv) < 2:
-        print("사용법: python backend/dummy/restore_user_emails.py [백업_테이블명]")
+        print("사용법: python backend/src/utils/restore_user_emails.py [백업_테이블명]")
         print("\n사용 가능한 백업 테이블 확인:")
         db = SessionLocal()
         try:

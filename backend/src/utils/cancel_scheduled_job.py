@@ -1,19 +1,19 @@
 """예약된 스케줄 작업 취소 스크립트 (개발자용)
 
 사용법:
-    python backend/dummy/cancel_scheduled_job.py [job_id]
+    python backend/src/utils/cancel_scheduled_job.py [job_id]
     
 예시:
     # 모든 예약된 작업 확인
-    python backend/dummy/cancel_scheduled_job.py
+    python backend/src/utils/cancel_scheduled_job.py
     
     # 특정 작업 취소
-    python backend/dummy/cancel_scheduled_job.py test_email_20260115_1430
+    python backend/src/utils/cancel_scheduled_job.py test_email_20260115_1430
 """
 import sys
 from pathlib import Path
 
-project_root = Path(__file__).parent.parent.parent
+project_root = Path(__file__).parent.parent.parent.parent
 sys.path.insert(0, str(project_root))
 sys.path.insert(0, str(project_root / "backend" / "src"))
 
@@ -54,7 +54,7 @@ def list_jobs():
     
     print("\n" + "=" * 60)
     print("작업을 취소하려면:")
-    print("  python backend/dummy/cancel_scheduled_job.py <job_id>")
+    print("  python backend/src/utils/cancel_scheduled_job.py <job_id>")
     print("=" * 60)
 
 def cancel_job(job_id: str):
