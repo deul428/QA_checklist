@@ -46,3 +46,4 @@ backend/*.log
 database/user_passwords.json
 database/user.csv
 database/example.csv 
+database/example - 복사본.csv 

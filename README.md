@@ -33,9 +33,9 @@ QA_checklist/
 cd E:\dev\projects\venv
 python -m venv qa_checklist
 E:\dev\projects\venv\qa_checklist\Scripts\activate
-cd E:\dev\projects\QA_checklist\backend
+cd E:\dev\projects\QA_checklist\backend\src
 pip install -r requirements.txt
-uvicorn main:app --reload
+uvicorn main:app --reload --host 0.0.0.0 --port 8003
 ```
 
 ### 프론트엔드 설정

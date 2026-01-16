@@ -11,6 +11,10 @@ const Checklist: React.FC = () => {
     Record<number, "PASS" | "FAIL">
   >({});
   const [notes, setNotes] = useState<Record<number, string>>({});
+  const [initialData, setInitialData] = useState<
+    Record<number, "PASS" | "FAIL">
+  >({});
+  const [initialNotes, setInitialNotes] = useState<Record<number, string>>({});
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [message, setMessage] = useState<{
@@ -31,23 +35,28 @@ const Checklist: React.FC = () => {
         setCheckItems(itemsData);
 
         // 기존 기록이 있으면 불러오기
-        const initialData: Record<number, "PASS" | "FAIL"> = {};
-        const initialNotes: Record<number, string> = {};
+        const loadedInitialData: Record<number, "PASS" | "FAIL"> = {};
+        const loadedInitialNotes: Record<number, string> = {};
         recordsData.forEach((record) => {
-          if (itemsData.some((item) => item.id === record.check_item_id)) {
-            initialData[record.check_item_id] = record.status as
+          if (itemsData.some((item) => item.id == record.check_item_id)) {
+            loadedInitialData[record.check_item_id] = record.status as
               | "PASS"
               | "FAIL";
             if (record.notes) {
-              initialNotes[record.check_item_id] = record.notes;
+              loadedInitialNotes[record.check_item_id] = record.notes;
             }
           }
         });
-        setChecklistData(initialData);
-        setNotes(initialNotes);
+        setChecklistData(loadedInitialData);
+        setNotes(loadedInitialNotes);
+        setInitialData(loadedInitialData);
+        setInitialNotes(loadedInitialNotes);
       } catch (error) {
         console.error("데이터 로딩 실패:", error);
-        setMessage({ type: "error", text: "데이터를 불러오는 데 실패했습니다. QA혁신팀 김희수 사원에게 문의하세요." });
+        setMessage({
+          type: "error",
+          text: "데이터를 불러오는 데 실패했습니다. QA혁신팀 김희수 사원에게 문의하세요.",
+        });
       } finally {
         setLoading(false);
       }
@@ -84,24 +93,65 @@ const Checklist: React.FC = () => {
       return;
     }
 
+    // FAIL 선택 항목 중 사유가 없는 항목 확인
+    const failItemsWithoutReason = checkItems.filter(
+      (item) =>
+        checklistData[item.id] === "FAIL" &&
+        (!notes[item.id] || notes[item.id].trim() === "")
+    );
+
+    if (failItemsWithoutReason.length > 0) {
+      setMessage({
+        type: "error",
+        text: `FAIL 선택 항목에 사유를 입력해 주세요. (${failItemsWithoutReason.length}개 미입력)`,
+      });
+      return;
+    }
+
     setSubmitting(true);
     setMessage(null);
 
     try {
-      const submitItems: ChecklistSubmitItem[] = checkItems.map((item) => ({
-        check_item_id: item.id,
-        status: checklistData[item.id],
-        notes: notes[item.id] || undefined,
-      }));
+      // 변경된 항목만 필터링하여 전송
+      const submitItems: ChecklistSubmitItem[] = checkItems
+        .filter((item) => {
+          const currentStatus = checklistData[item.id];
+          const currentNote = notes[item.id] || "";
+          const originalStatus = initialData[item.id];
+          const originalNote = initialNotes[item.id] || "";
+
+          // 상태가 변경되었거나, 노트가 변경되었거나, 새로 추가된 항목인 경우
+          return (
+            currentStatus !== originalStatus ||
+            currentNote !== originalNote ||
+            (currentStatus && !originalStatus)
+          );
+        })
+        .map((item) => ({
+          check_item_id: item.id,
+          status: checklistData[item.id],
+          notes: notes[item.id] || undefined,
+        }));
+
+      // 변경된 항목이 없으면 저장하지 않음
+      if (submitItems.length === 0) {
+        setMessage({
+          type: "success",
+          text: "변경된 항목이 없습니다.",
+        });
+        return;
+      }
 
       await checklistAPI.submitChecklist(submitItems);
-      
+
       // 저장 성공 후 대시보드로 이동
       navigate("/dashboard");
     } catch (error: any) {
       setMessage({
         type: "error",
-        text: error.response?.data?.detail || "저장에 실패했습니다. QA혁신팀 김희수 사원에게 문의하세요.",
+        text:
+          error.response?.data?.detail ||
+          "저장에 실패했습니다. QA혁신팀 김희수 사원에게 문의하세요.",
       });
     } finally {
       setSubmitting(false);
@@ -114,29 +164,42 @@ const Checklist: React.FC = () => {
 
   return (
     <div className="checklist-page">
-      <div className="container">
-        <div className="checklist-header">
-          <h1>체크리스트 작성</h1>
-          <button
-            onClick={() => navigate("/dashboard")}
-            className="btn btn-secondary"
-          >
-            ← 뒤로가기
-          </button>
+      <div className="checklist-header header">
+        <h1>체크리스트 작성</h1>
+        <button
+          onClick={() => navigate("/dashboard")}
+          className="btn btn-secondary"
+        >
+          ← 뒤로가기
+        </button>
+      </div>
+
+      {message && (
+        <div className={`toast alert alert-${message.type}`}>
+          {message.text}
         </div>
+      )}
 
-        {message && (
-          <div className={`alert alert-${message.type}`}>{message.text}</div>
-        )}
-
-        <div className="card">
-          {checkItems.length === 0 ? (
-            <div className="empty-state">체크 항목이 없습니다.</div>
-          ) : (
-            <>
-              <div className="check-item-container">
-                {checkItems.map((item, index) => (
-                  <div key={item.id} className="check-item">
+      <div className="">
+        {checkItems.length === 0 ? (
+          <div className="empty-state">체크 항목이 없습니다.</div>
+        ) : (
+          <>
+            <div className="check-item-container">
+              {checkItems.map((item, index) => (
+                <>
+                  <div
+                    key={item.id}
+                    className="check-item"
+                    style={{
+                      borderBottom:
+                        checklistData[item.id] === "FAIL"
+                          ? "1px solid transparent"
+                          : "1px solid #e8ddd4",
+                      paddingBottom:
+                        checklistData[item.id] === "FAIL" ? "0" : "0.5rem",
+                    }}
+                  >
                     <div className="check-item-header">
                       <span className="item-number">{index + 1}</span>
                       <h4>{item.item_name}</h4>
@@ -177,21 +240,40 @@ const Checklist: React.FC = () => {
                       /> */}
                     </div>
                   </div>
-                ))}
-              </div>
+                  {checklistData[item.id] === "FAIL" && (
+                    <>
+                      <textarea
+                        className="notes-input"
+                        placeholder="FAIL 사유를 입력하세요. (필수)"
+                        value={notes[item.id] || ""}
+                        onChange={(e) =>
+                          handleNoteChange(item.id, e.target.value)
+                        }
+                      />
+                      <div
+                        className="notes-input-footer"
+                        style={{
+                          display: "flex",
+                          borderTop: "1px solid #e8ddd4",
+                        }}
+                      ></div>
+                    </>
+                  )}
+                </>
+              ))}
+            </div>
 
-              <div className="submit-section">
-                <button
-                  onClick={handleSubmit}
-                  className="btn btn-success btn-large"
-                  disabled={submitting}
-                >
-                  {submitting ? "저장 중..." : "확인 및 저장"}
-                </button>
-              </div>
-            </>
-          )}
-        </div>
+            <div className="submit-section">
+              <button
+                onClick={handleSubmit}
+                className="btn btn-success btn-large"
+                disabled={submitting}
+              >
+                {submitting ? "저장 중..." : "확인 및 저장"}
+              </button>
+            </div>
+          </>
+        )}
       </div>
     </div>
   );

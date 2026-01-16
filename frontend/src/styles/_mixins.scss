@@ -1,4 +1,4 @@
-@import './variables';
+@import "./variables";
 
 // 버튼 기본 스타일 믹스인
 @mixin button-base {
@@ -17,9 +17,9 @@
 }
 
 // 버튼 색상 변형 믹스인
-@mixin button-variant($bg-color, $hover-color) {
+@mixin button-variant($bg-color, $text-color, $hover-color) {
   background-color: $bg-color;
-  color: white;
+  color: $text-color;
 
   &:hover:not(:disabled) {
     background-color: $hover-color;
@@ -30,7 +30,7 @@
 @mixin card {
   background: $bg-white;
   border-radius: $border-radius-md;
-  padding: 24px;
+  padding: $spacing-md;
   box-shadow: $shadow-md;
 }
 
@@ -43,7 +43,7 @@
   font-size: $font-size-sm;
   font-family: inherit;
   background-color: $bg-white;
-
+  transition: all $transition-base;
   &:focus {
     outline: none;
     border-color: $primary-color;
@@ -60,4 +60,3 @@
   border: 1px solid $border-color;
   color: $text-color;
 }
-

@@ -1,20 +1,47 @@
 @import "../styles/variables";
 @import "../styles/mixins";
 
+// 토스트 알림 애니메이션
+@keyframes slideIn {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+@keyframes fadeOut {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+.toast {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  z-index: 1000;
+  min-width: 300px;
+  max-width: 500px;
+  padding: 15px 20px;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  animation: slideIn 0.3s ease-out, fadeOut 0.3s ease-in 4.7s;
+  animation-fill-mode: both;
+}
+
 .checklist-page {
-  min-height: 100vh;
-  background-color: $bg-primary;
   padding-bottom: $spacing-xl;
 }
 
 // 헤더
 .checklist-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: $spacing-md;
-  margin-bottom: $spacing-md;
-
   h1 {
     color: $primary-color;
     font-size: $font-size-xxl;
@@ -23,19 +50,16 @@
   }
 }
 
-// 체크 항목 컨테이너 (card 안에 있음)
-.card {
-  .check-item-container {
-    width: 100%;
-    display: grid;
-    // grid-template-columns: repeat(3, 1fr);
-    gap: 0.5rem;
-  }
+.check-item-container {
+  width: 100%;
+  display: grid;
+  // grid-template-columns: repeat(3, 1fr);
+  gap: 0.5rem;
 }
 
 // 체크 항목
 .check-item {
-  padding-bottom: 0.5rem;
+  padding-bottom: 1rem;
   border-bottom: 1px solid $border-light;
   display: flex;
   // gap: 0 1rem;
@@ -46,7 +70,7 @@
   .check-item-header {
     display: flex;
     align-items: center;
-    width: 40%;
+    width: 30%;
     gap: $spacing-sm;
 
     h4 {
@@ -71,7 +95,7 @@
       .status-btn {
         flex: 1;
         font-size: $font-size-sm;
-        padding: 0.5rem $spacing-sm;
+        padding: 0.5rem 2rem /*  $spacing-sm */;
         border: none;
         background: $bg-white;
         cursor: pointer;
@@ -80,13 +104,13 @@
 
         &.pass.active {
           background-color: $success-color;
-          color: $text-on-primary;
+          color: $text-white;
           border-color: $success-color;
         }
 
         &.fail.active {
           background-color: $danger-color;
-          color: $text-on-primary;
+          color: $text-white;
           border-color: $danger-color;
         }
 
@@ -115,7 +139,9 @@
   @include input-base;
   width: 100%;
   resize: vertical;
+  margin-top: 0;
   min-height: 80px;
+  padding-bottom: 1rem;
 }
 
 // 제출 섹션
