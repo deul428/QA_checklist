@@ -1,0 +1,247 @@
+@import "../styles/variables";
+@import "../styles/mixins";
+
+// Console page container styles are inherited from App.scss
+
+section {
+  border-top: 1px solid $border-color;
+  padding-top: $spacing-lg;
+  margin-top: $spacing-lg;
+  &:first-child {
+    border-top: none;
+    padding-top: 0;
+    margin-top: 0;
+  }
+}
+.toast {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  z-index: 1000;
+  min-width: 200px;
+  max-width: 500px;
+  padding: 15px 20px;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  animation: slideIn 0.3s ease-out, fadeOut 0.3s ease-in 4.7s;
+  animation-fill-mode: both;
+}
+section.btn-area {
+  display: flex;
+  flex-direction: row;
+  gap: $spacing-lg;
+  width: 100%;
+  justify-content: space-between;
+
+  .excel-export-section {
+    display: flex;
+    flex-direction: row;
+    gap: $spacing-sm;
+    .date-range-selector {
+      display: flex;
+      flex-direction: column;
+      gap: $spacing-sm;
+
+      label {
+        font-size: $font-size-xs;
+        font-weight: 500;
+      }
+      span {
+        font-size: $font-size-lg;
+      }
+
+      .quick-date-buttons {
+        display: flex;
+        gap: $spacing-xs;
+
+        .btn-quick-date { 
+          cursor: pointer;  
+        }
+      }
+
+      .date-inputs {
+        display: flex;
+        align-items: center;
+        gap: 0.25rem;
+
+        .date-input {
+          padding: $spacing-xs $spacing-sm;
+          border: 1px solid $border-color;
+          border-radius: 4px;
+          font-size: $font-size-sm;
+        }
+      }
+    }
+  }
+
+  .email-send-section {
+    display: flex;
+    flex-direction: column;
+    gap: $spacing-sm;
+    align-items: flex-end;
+    .email-send-form {
+      .time-input-section {
+        display: flex;
+        gap: $spacing-xs;
+        align-items: stretch;
+        input {
+          width: 160px;
+        }
+      }
+    }
+  }
+}
+
+section.stats-section {
+  .stats-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: $spacing-md;
+    flex-wrap: wrap;
+    gap: $spacing-md;
+    h2 {
+      margin: 0;
+    }
+  }
+  .stats-chart {
+    .chart-container {
+      display: flex;
+      flex-direction: column;
+      gap: $spacing-xs;
+    }
+
+    .chart-item {
+      display: flex;
+      align-items: center;
+      gap: $spacing-md;
+
+      .chart-label {
+        min-width: 80px;
+        font-weight: bold;
+      }
+
+      .chart-bar {
+        flex: 1;
+        height: 1.5rem;
+        background-color: #e0e0e0;
+        border-radius: 4px;
+        overflow: hidden;
+        position: relative;
+
+        .chart-fill {
+          height: 100%;
+          border-radius: 4px;
+          transition: width 0.3s ease;
+        }
+      }
+
+      .chart-value {
+        min-width: 60px;
+        text-align: right;
+        font-weight: bold;
+      }
+
+      &.pass .chart-fill {
+        background-color: #4caf50;
+      }
+
+      &.fail .chart-fill {
+        background-color: #f44336;
+      }
+
+      &.unchecked .chart-fill {
+        background-color: #ff9800;
+      }
+    }
+  }
+}
+
+section.fail-items-section {
+  .table-wrapper {
+    max-height: 450px;
+    overflow-y: auto;
+    border: 1px solid $border-color;
+    border-radius: 4px;
+    margin-top: $spacing-md;
+  }
+
+  .fail-items-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: $font-size-sm;
+
+    th,
+    td {
+      padding: 0.7rem $spacing-xs;
+    }
+    thead {
+      background-color: $accent-color;
+      color: $text-primary;
+      position: sticky;
+      top: 0;
+      z-index: 10;
+
+      th {
+        text-align: left;
+        font-weight: bold;
+      }
+    }
+
+    tbody {
+      tr {
+        border-bottom: 1px solid #e0e0e0;
+        width: 100%;
+        &.resolved {
+          background-color: #f5f5f5;
+          color: #888;
+        }
+        td {
+          min-width: 150px;
+          max-width: 500px;
+          line-height: 1.5;
+        }
+      }
+    }
+  }
+  .status-badge {
+    display: inline-block;
+    padding: 4px 16px;
+    border-radius: 12px;
+    font-size: 0.9rem;
+    font-weight: bold;
+
+    &.resolved {
+      background-color: #4caf50;
+      color: white;
+    }
+
+    &.pending {
+      background-color: #f44336;
+      color: white;
+    }
+  }
+}
+
+.no-data {
+  text-align: center;
+  padding: $spacing-xl;
+  color: #888;
+  font-size: 1.1rem;
+}
+
+.loading,
+.error-message {
+  text-align: center;
+  font-size: 1.2rem;
+}
+
+.loading {
+  padding: $spacing-xl;
+}
+
+.error-message {
+  font-size: $font-size-sm;
+  color: #f44336;
+  margin-bottom: $spacing-lg;
+}

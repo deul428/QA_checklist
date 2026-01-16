@@ -11,6 +11,10 @@ const Checklist: React.FC = () => {
     Record<number, "PASS" | "FAIL">
   >({});
   const [notes, setNotes] = useState<Record<number, string>>({});
+  const [initialData, setInitialData] = useState<
+    Record<number, "PASS" | "FAIL">
+  >({});
+  const [initialNotes, setInitialNotes] = useState<Record<number, string>>({});
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [message, setMessage] = useState<{
@@ -31,20 +35,22 @@ const Checklist: React.FC = () => {
         setCheckItems(itemsData);
 
         // 기존 기록이 있으면 불러오기
-        const initialData: Record<number, "PASS" | "FAIL"> = {};
-        const initialNotes: Record<number, string> = {};
+        const loadedInitialData: Record<number, "PASS" | "FAIL"> = {};
+        const loadedInitialNotes: Record<number, string> = {};
         recordsData.forEach((record) => {
-          if (itemsData.some((item) => item.id === record.check_item_id)) {
-            initialData[record.check_item_id] = record.status as
+          if (itemsData.some((item) => item.id == record.check_item_id)) {
+            loadedInitialData[record.check_item_id] = record.status as
               | "PASS"
               | "FAIL";
             if (record.notes) {
-              initialNotes[record.check_item_id] = record.notes;
+              loadedInitialNotes[record.check_item_id] = record.notes;
             }
           }
         });
-        setChecklistData(initialData);
-        setNotes(initialNotes);
+        setChecklistData(loadedInitialData);
+        setNotes(loadedInitialNotes);
+        setInitialData(loadedInitialData);
+        setInitialNotes(loadedInitialNotes);
       } catch (error) {
         console.error("데이터 로딩 실패:", error);
         setMessage({
@@ -106,11 +112,35 @@ const Checklist: React.FC = () => {
     setMessage(null);
 
     try {
-      const submitItems: ChecklistSubmitItem[] = checkItems.map((item) => ({
-        check_item_id: item.id,
-        status: checklistData[item.id],
-        notes: notes[item.id] || undefined,
-      }));
+      // 변경된 항목만 필터링하여 전송
+      const submitItems: ChecklistSubmitItem[] = checkItems
+        .filter((item) => {
+          const currentStatus = checklistData[item.id];
+          const currentNote = notes[item.id] || "";
+          const originalStatus = initialData[item.id];
+          const originalNote = initialNotes[item.id] || "";
+
+          // 상태가 변경되었거나, 노트가 변경되었거나, 새로 추가된 항목인 경우
+          return (
+            currentStatus !== originalStatus ||
+            currentNote !== originalNote ||
+            (currentStatus && !originalStatus)
+          );
+        })
+        .map((item) => ({
+          check_item_id: item.id,
+          status: checklistData[item.id],
+          notes: notes[item.id] || undefined,
+        }));
+
+      // 변경된 항목이 없으면 저장하지 않음
+      if (submitItems.length === 0) {
+        setMessage({
+          type: "success",
+          text: "변경된 항목이 없습니다.",
+        });
+        return;
+      }
 
       await checklistAPI.submitChecklist(submitItems);
 
@@ -131,76 +161,76 @@ const Checklist: React.FC = () => {
   if (loading) {
     return <div className="loading">로딩 중...</div>;
   }
-  console.log(checklistData);
 
   return (
     <div className="checklist-page">
-      <div className="container">
-        <div className="checklist-header">
-          <h1>체크리스트 작성</h1>
-          <button
-            onClick={() => navigate("/dashboard")}
-            className="btn btn-secondary"
-          >
-            ← 뒤로가기
-          </button>
+      <div className="checklist-header header">
+        <h1>체크리스트 작성</h1>
+        <button
+          onClick={() => navigate("/dashboard")}
+          className="btn btn-secondary"
+        >
+          ← 뒤로가기
+        </button>
+      </div>
+
+      {message && (
+        <div className={`toast alert alert-${message.type}`}>
+          {message.text}
         </div>
+      )}
 
-        {message && (
-          <div className={`alert alert-${message.type}`}>{message.text}</div>
-        )}
-
-        <div className="card">
-          {checkItems.length === 0 ? (
-            <div className="empty-state">체크 항목이 없습니다.</div>
-          ) : (
-            <>
-              <div className="check-item-container">
-                {checkItems.map((item, index) => (
-                  <>
-                    <div
-                      key={item.id}
-                      className="check-item"
-                      style={{
-                        borderBottom:
-                          checklistData[item.id] === "FAIL"
-                            ? "1px solid transparent"
-                            : "1px solid #e8ddd4",
-                        paddingBottom:
-                          checklistData[item.id] === "FAIL" ? "0" : "0.5rem",
-                      }}
-                    >
-                      <div className="check-item-header">
-                        <span className="item-number">{index + 1}</span>
-                        <h4>{item.item_name}</h4>
+      <div className="">
+        {checkItems.length === 0 ? (
+          <div className="empty-state">체크 항목이 없습니다.</div>
+        ) : (
+          <>
+            <div className="check-item-container">
+              {checkItems.map((item, index) => (
+                <>
+                  <div
+                    key={item.id}
+                    className="check-item"
+                    style={{
+                      borderBottom:
+                        checklistData[item.id] === "FAIL"
+                          ? "1px solid transparent"
+                          : "1px solid #e8ddd4",
+                      paddingBottom:
+                        checklistData[item.id] === "FAIL" ? "0" : "0.5rem",
+                    }}
+                  >
+                    <div className="check-item-header">
+                      <span className="item-number">{index + 1}</span>
+                      <h4>{item.item_name}</h4>
+                    </div>
+                    <div className="item-description">
+                      <p>{item.description}</p>
+                    </div>
+                    <div className="check-item-actions">
+                      <div className="status-buttons">
+                        <button
+                          className={`status-btn ${
+                            checklistData[item.id] === "PASS"
+                              ? "active pass"
+                              : ""
+                          }`}
+                          onClick={() => handleStatusChange(item.id, "PASS")}
+                        >
+                          PASS
+                        </button>
+                        <button
+                          className={`status-btn ${
+                            checklistData[item.id] === "FAIL"
+                              ? "active fail"
+                              : ""
+                          }`}
+                          onClick={() => handleStatusChange(item.id, "FAIL")}
+                        >
+                          FAIL
+                        </button>
                       </div>
-                      <div className="item-description">
-                        <p>{item.description}</p>
-                      </div>
-                      <div className="check-item-actions">
-                        <div className="status-buttons">
-                          <button
-                            className={`status-btn ${
-                              checklistData[item.id] === "PASS"
-                                ? "active pass"
-                                : ""
-                            }`}
-                            onClick={() => handleStatusChange(item.id, "PASS")}
-                          >
-                            PASS
-                          </button>
-                          <button
-                            className={`status-btn ${
-                              checklistData[item.id] === "FAIL"
-                                ? "active fail"
-                                : ""
-                            }`}
-                            onClick={() => handleStatusChange(item.id, "FAIL")}
-                          >
-                            FAIL
-                          </button>
-                        </div>
-                        {/* <textarea
+                      {/* <textarea
                         className="notes-input"
                         placeholder="특이사항이나 메모를 입력하세요 (선택사항)"
                         value={notes[item.id] || ""}
@@ -208,43 +238,42 @@ const Checklist: React.FC = () => {
                           handleNoteChange(item.id, e.target.value)
                         }
                       /> */}
-                      </div>
                     </div>
-                    {checklistData[item.id] === "FAIL" && (
-                      <>
-                        <textarea
-                          className="notes-input"
-                          placeholder="FAIL 사유를 입력하세요. (필수)"
-                          value={notes[item.id] || ""}
-                          onChange={(e) =>
-                            handleNoteChange(item.id, e.target.value)
-                          }
-                        />
-                        <div
-                          className="notes-input-footer"
-                          style={{
-                            display: "flex",
-                            borderTop: "1px solid #e8ddd4", 
-                          }}
-                        ></div>
-                      </>
-                    )}
-                  </>
-                ))}
-              </div>
+                  </div>
+                  {checklistData[item.id] === "FAIL" && (
+                    <>
+                      <textarea
+                        className="notes-input"
+                        placeholder="FAIL 사유를 입력하세요. (필수)"
+                        value={notes[item.id] || ""}
+                        onChange={(e) =>
+                          handleNoteChange(item.id, e.target.value)
+                        }
+                      />
+                      <div
+                        className="notes-input-footer"
+                        style={{
+                          display: "flex",
+                          borderTop: "1px solid #e8ddd4",
+                        }}
+                      ></div>
+                    </>
+                  )}
+                </>
+              ))}
+            </div>
 
-              <div className="submit-section">
-                <button
-                  onClick={handleSubmit}
-                  className="btn btn-success btn-large"
-                  disabled={submitting}
-                >
-                  {submitting ? "저장 중..." : "확인 및 저장"}
-                </button>
-              </div>
-            </>
-          )}
-        </div>
+            <div className="submit-section">
+              <button
+                onClick={handleSubmit}
+                className="btn btn-success btn-large"
+                disabled={submitting}
+              >
+                {submitting ? "저장 중..." : "확인 및 저장"}
+              </button>
+            </div>
+          </>
+        )}
       </div>
     </div>
   );

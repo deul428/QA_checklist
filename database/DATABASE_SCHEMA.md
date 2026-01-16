@@ -8,6 +8,77 @@ DX본부 시스템 체크리스트은 SQLite 데이터베이스를 사용하며,
 
 ---
 
+## 조회 편의 VIEW
+
+데이터베이스 조회 시 `user_id`와 함께 사용자 이름, 사번 등을 함께 볼 수 있도록 VIEW가 제공됩니다.
+
+### 1. checklist_records_view
+
+체크리스트 기록과 사용자 정보, 체크 항목 정보를 함께 조회할 수 있는 VIEW입니다.
+
+**포함 컬럼:**
+- `id`, `user_id`, `employee_id`, `user_name`, `user_email` (사용자 정보)
+- `check_item_id`, `item_name`, `system_id`, `system_name` (체크 항목 및 시스템 정보)
+- `check_date`, `status`, `notes`, `checked_at` (체크 기록 정보)
+
+**사용 예시:**
+```sql
+SELECT * FROM checklist_records_view 
+WHERE check_date = '2026-01-15';
+```
+
+### 2. user_system_assignments_view
+
+사용자-시스템 할당 정보와 사용자 정보, 시스템 정보를 함께 조회할 수 있는 VIEW입니다.
+
+**포함 컬럼:**
+- `id`, `user_id`, `employee_id`, `user_name`, `user_email` (사용자 정보)
+- `division`, `general_headquarters`, `headquarters`, `department`, `position`, `role` (조직 정보)
+- `system_id`, `system_name`, `system_description` (시스템 정보)
+- `created_at` (할당 시간)
+
+**사용 예시:**
+```sql
+SELECT * FROM user_system_assignments_view 
+WHERE user_name LIKE '%김%';
+```
+
+### 3. check_items_view
+
+체크 항목과 시스템 정보를 함께 조회할 수 있는 VIEW입니다.
+
+**포함 컬럼:**
+- `id`, `system_id`, `system_name`, `system_description` (시스템 정보)
+- `item_name`, `description`, `order_index` (체크 항목 정보)
+- `created_at` (생성 시간)
+
+**사용 예시:**
+```sql
+SELECT * FROM check_items_view 
+WHERE system_name = 'IAS Sales';
+```
+
+### 4. user_system_assignments_with_items_view
+
+사용자-시스템 할당 정보와 해당 시스템의 체크 항목 정보를 함께 조회할 수 있는 VIEW입니다. 한 사용자가 담당하는 시스템의 모든 체크 항목을 함께 볼 수 있습니다.
+
+**포함 컬럼:**
+- `assignment_id`, `user_id`, `employee_id`, `user_name`, `user_email` (사용자 정보)
+- `division`, `general_headquarters`, `headquarters`, `department`, `position`, `role` (조직 정보)
+- `system_id`, `system_name`, `system_description` (시스템 정보)
+- `check_item_id`, `item_name`, `item_description`, `order_index` (체크 항목 정보)
+- `assigned_at` (할당 시간)
+
+**사용 예시:**
+```sql
+-- 특정 사용자가 담당하는 시스템의 체크 항목 조회
+SELECT * FROM user_system_assignments_with_items_view 
+WHERE user_name = '김지훈'
+ORDER BY system_name, order_index;
+```
+
+---
+
 ## 테이블 구조
 
 ### 1. users (사용자 테이블)

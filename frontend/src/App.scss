@@ -1,16 +1,32 @@
-@import './styles/variables';
-@import './styles/mixins';
+@import "./styles/variables";
+@import "./styles/mixins";
 
-.App {
+#App {
   min-height: 100vh;
-  background-color: $bg-primary;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
-
-// 레이아웃
-.container {
-  max-width: 1200px;
-  margin: 0 auto;
-  padding: $spacing-md;
+h1 {
+  font-size: $font-size-xl;
+  font-weight: 700;
+}
+h2 {
+  font-size: $font-size-lg;
+  font-weight: 700;
+  color: $primary-color;
+  margin-bottom: $spacing-md;
+}
+h3 {
+  font-size: $font-size-base;
+  font-weight: 700;
+}
+#wrap {
+  width: calc(70dvw - 4rem);
+  height: calc(100dvh - 4rem);
+  padding: 2rem;
+  border-radius: $border-radius-lg;
+  background: #fff;
 }
 
 // 카드 컴포넌트
@@ -24,20 +40,31 @@
   @include button-base;
 
   &-primary {
-    @include button-variant($primary-color, $primary-hover);
-    color: $text-on-primary;
+    @include button-variant($primary-color, $text-white, $primary-hover);
+    color: $text-white;
   }
 
   &-secondary {
-    @include button-variant($secondary-color, $secondary-hover);
+    @include button-variant($secondary-color, $text-white, $secondary-hover);
+  }
+
+  &-dark {
+    @include button-variant($dark-color, $text-white, $dark-hover);
+  }
+  &-light {
+    @include button-variant($light-color, $text-dark, $light-hover);
+    box-shadow: $shadow-md;
   }
 
   &-success {
-    @include button-variant($success-color, $success-hover);
+    @include button-variant($success-color, $text-white, $success-hover);
   }
 
   &-danger {
-    @include button-variant($danger-color, $danger-hover);
+    @include button-variant($danger-color, $text-white, $danger-hover);
+  }
+  &-accent {
+    @include button-variant($accent-color, #3889ac, $accent-light);
   }
 
   &-block {
@@ -50,24 +77,16 @@
     font-weight: 600;
   }
 }
-
-// 입력 필드 컴포넌트
-.input {
-  @include input-base;
-  
-  &:focus {
-    border-color: $primary-color;
-    box-shadow: 0 0 0 3px rgba(56, 137, 172, 0.1);
-  }
-}
-
 .label {
   display: block;
   margin-bottom: $spacing-xs;
   font-weight: 500;
   color: $text-primary;
 }
-
+input {
+  @include input-base;
+  height: 40px;
+}
 // 알림 컴포넌트
 .alert {
   &-success {
@@ -83,6 +102,34 @@
   }
 }
 
+.btn-set {
+  display: flex;
+  gap: $spacing-sm;
+}
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: $spacing-md;
+  margin-bottom: $spacing-md;
+  width: 100%;
+  // background-color: $bg-primary;
+  border-bottom: 1px solid $primary-color;
+  padding: 0;
+  padding-bottom: 1.5rem;
+  h1 {
+    color: $primary-color;
+    font-size: $font-size-xxl;
+    margin: 0;
+  }
+  .header-content {
+    width: 100%;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin: 0;
+  }
+}
 // 공통 상태 컴포넌트
 .loading {
   text-align: center;
@@ -98,4 +145,3 @@
   background: $bg-white;
   border-radius: $border-radius-md;
 }
-

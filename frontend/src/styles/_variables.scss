@@ -1,13 +1,13 @@
 // 메인 컬러 팔레트
-$primary-color: #3889AC;        // 메인 블루
-$primary-hover: #2d6f8a;        // 호버 시 어두운 블루
-$primary-light: #5ba3c4;        // 밝은 블루
-$accent-color: #f6e7d3;          // 베이지/크림
-$accent-light: #ECDDC8;          // 베이지/크림
+$primary-color: #3889ac; // 메인 블루
+$primary-hover: #2d6f8a; // 호버 시 어두운 블루
+$primary-light: #5ba3c4; // 밝은 블루
+$accent-color: #f6e7d3; // 베이지/크림
+$accent-light: #ecddc8; // 베이지/크림
 
 // 보조 색상
-$secondary-color: #3889AC;
-$secondary-hover: #2d6f8a;
+$secondary-color: #56A9C8;
+$secondary-hover: #428eaa;
 $success-color: #28a745;
 $success-hover: #218838;
 $danger-color: #dc3545;
@@ -15,41 +15,47 @@ $danger-hover: #c82333;
 $warning-color: #ffc107;
 $warning-bg: #fff3cd;
 $warning-text: #856404;
+$dark-color: #525252;
+$dark-hover: #3d3d3d;
+$light-color: #ddd;
+$light-hover: #ccc;
 
 // 텍스트 색상
-$text-primary: #2c3e50;         // 어두운 블루-그레이
-$text-secondary: #5a6c7d;       // 중간 그레이
-$text-muted: #8a9ba8;           // 연한 그레이
-$text-on-primary: #ffffff;      // 메인 컬러 위 텍스트
+$text-primary: #2c3e50; // 어두운 블루-그레이
+$text-secondary: #5a6c7d; // 중간 그레이
+$text-muted: #8a9ba8; // 연한 그레이
+$text-dark: #333; // 어두운 그레이
+$text-white: #ffffff; // 메인 컬러 위 텍스트
+$text-on-accent: #856404; // 메인 컬러 위 텍스트
 
 // 배경 색상
-$bg-primary: #f6e7d3;            // 베이지 배경
+$bg-primary: #f6e7d3; // 베이지 배경
 $bg-white: #ffffff;
-$bg-light: #f5f0eb;              // 연한 베이지
+$bg-light: #f5f0eb; // 연한 베이지
 
 // 테두리 색상
-$border-color: #d4c4b8;          // 베이지 계열 테두리
-$border-light: #e8ddd4;          // 연한 베이지 테두리
+$border-color: #d4c4b8; // 베이지 계열 테두리
+$border-light: #e8ddd4; // 연한 베이지 테두리
 
 // 그림자
-$shadow-md: 0 2px 4px rgba(0, 0, 0, 0.1);
-$shadow-md: 0 4px 8px rgba(0, 0, 0, 0.05);
+$shadow-sm: 0 2px 4px rgba(0, 0, 0, 0.2);
+$shadow-md: 0 2px 6px rgba(0, 0, 0, 0.1);
 $shadow-lg: 0 10px 40px rgba(0, 0, 0, 0.2);
 
 // 간격
-$spacing-xs: 8px;
-$spacing-sm: 12px;
-$spacing-md: 20px;
-$spacing-lg: 30px;
-$spacing-xl: 40px;
+$spacing-xs: 0.5rem;
+$spacing-sm: 1rem;
+$spacing-md: 1.5rem;
+$spacing-lg: 2rem;
+$spacing-xl: 2.5rem;
 
 // 폰트 크기
-$font-size-xs: 12px;
-$font-size-sm: 14px;
-$font-size-base: 16px;
-$font-size-lg: 18px;
-$font-size-xl: 20px;
-$font-size-xxl: 24px;
+$font-size-xs: 0.75rem;
+$font-size-sm: 0.875rem;
+$font-size-base: 1rem;
+$font-size-lg: 1.125rem;
+$font-size-xl: 1.5rem;
+$font-size-xxl: 1.8rem;
 
 // 테두리 반경
 $border-radius-sm: 4px;
