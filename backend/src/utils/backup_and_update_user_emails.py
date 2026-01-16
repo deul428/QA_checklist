@@ -9,7 +9,7 @@ import sys
 from pathlib import Path
 from datetime import datetime
 
-project_root = Path(__file__).parent.parent.parent
+project_root = Path(__file__).parent.parent.parent.parent
 sys.path.insert(0, str(project_root))
 sys.path.insert(0, str(project_root / "backend" / "src"))
 
@@ -111,7 +111,7 @@ def backup_and_update_emails():
         print(f"\n백업 테이블: {backup_table_name}")
         print(f"테스트 이메일: {TEST_EMAIL}")
         print("\n복구 방법:")
-        print(f"  python backend/dummy/restore_user_emails.py {backup_table_name}")
+        print(f"  python backend/src/utils/restore_user_emails.py {backup_table_name}")
         print("="*60)
         
     except Exception as e:
