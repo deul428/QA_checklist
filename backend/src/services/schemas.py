@@ -21,6 +21,7 @@ class UserResponse(BaseModel):
     department: Optional[str] = None
     position: Optional[str] = None
     role: Optional[str] = None
+    console_role: bool = False
     
     class Config:
         from_attributes = True

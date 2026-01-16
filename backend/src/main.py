@@ -277,15 +277,27 @@ async def login(
     #     )
 
     access_token = create_access_token(data={"sub": user.employee_id})
+    
+    # UserResponse 스키마를 사용하여 모든 필드 포함
+    from services.schemas import UserResponse
+    user_response = UserResponse(
+        id=user.id,
+        employee_id=user.employee_id,
+        name=user.name,
+        email=user.email,
+        division=user.division,
+        general_headquarters=user.general_headquarters,
+        headquarters=user.department,  # department를 headquarters로도 반환 (프론트엔드 호환성)
+        department=user.department,
+        position=user.position,
+        role=user.role,
+        console_role=user.console_role,
+    )
+    
     return {
         "access_token": access_token,
         "token_type": "bearer",
-        "user": {
-            "id": user.id,
-            "employee_id": user.employee_id,
-            "name": user.name,
-            "email": user.email,
-        },
+        "user": user_response.model_dump(),
     }
 
 
@@ -492,13 +504,9 @@ async def submit_checklist(
     return {"message": "체크리스트가 성공적으로 저장되었습니다"}
 
 
-# 특정 사번만 console 페이지 접근 가능
-CONSOLE_ACCESS_EMPLOYEE_IDS = ["224147", "224005", "225016"]
-
-
 def check_console_access(current_user: User):
-    """console 페이지 접근 권한 체크"""
-    if current_user.employee_id not in CONSOLE_ACCESS_EMPLOYEE_IDS:
+    """console 페이지 접근 권한 체크 (DB의 console_role 컬럼 확인)"""
+    if not current_user.console_role:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="console 페이지 접근 권한이 없습니다",

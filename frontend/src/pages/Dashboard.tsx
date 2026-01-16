@@ -5,7 +5,7 @@ import { userAPI, checklistAPI, System } from "../api/api";
 import "./Dashboard.scss";
 
 const Dashboard: React.FC = () => {
-  const { user, logout } = useAuth();
+  const { user, logout, loading: authLoading } = useAuth();
   const navigate = useNavigate();
   const [systems, setSystems] = useState<System[]>([]);
   const [uncheckedCount, setUncheckedCount] = useState(0);
@@ -14,6 +14,11 @@ const Dashboard: React.FC = () => {
   );
   const [loading, setLoading] = useState(true);
   useEffect(() => {
+    // AuthContext의 로딩이 완료되고 user가 있을 때만 데이터 로드
+    if (authLoading || !user) {
+      return;
+    }
+
     const fetchData = async () => {
       try {
         const [systemsData, uncheckedData] = await Promise.all([
@@ -41,13 +46,14 @@ const Dashboard: React.FC = () => {
     };
 
     fetchData();
-  }, []); // 컴포넌트 마운트 시와 대시보드로 돌아올 때마다 데이터 갱신
+  }, [authLoading, user]); // authLoading과 user가 변경될 때마다 실행
 
   const handleSystemClick = (systemId: number) => {
     navigate(`/checklist/${systemId}`);
   };
 
-  if (loading) {
+  // AuthContext 로딩 중이거나 user가 없으면 로딩 표시
+  if (authLoading || !user || loading) {
     return <div className="loading">로딩 중...</div>;
   }
 
@@ -63,13 +69,11 @@ const Dashboard: React.FC = () => {
           <h1>DX본부 시스템 체크리스트 ({formattedDate})</h1>
           <div className="user-info">
             <span>
-              {user?.general_headquarters} {user?.headquarters} {user?.name}님 (
+              {user?.general_headquarters} {user?.name}님 (
               {user?.employee_id})
             </span>
             <div className="btn-set">
-              {["224147", "224005", "225016"].includes(
-                user?.employee_id || ""
-              ) && (
+              {user?.console_role && (
                 <button
                   onClick={() => navigate("/console")}
                   className="btn btn-accent"

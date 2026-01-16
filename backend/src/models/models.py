@@ -17,6 +17,7 @@ class User(Base):
     department = Column(String(100), nullable=True)  # 부서 (파트장/팀원만 존재, 이전 headquarters와 동일)
     position = Column(String(50), nullable=True)  # 직위
     role = Column(String(50), nullable=True)  # 직책
+    console_role = Column(Boolean, default=False, nullable=False)  # 콘솔 페이지 접근 권한 (관리자)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 

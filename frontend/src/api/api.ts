@@ -81,6 +81,7 @@ export interface User {
   headquarters: string;
   name: string;
   email: string;
+  console_role: boolean;
 }
 
 export interface System {
