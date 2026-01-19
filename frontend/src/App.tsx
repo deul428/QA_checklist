@@ -16,7 +16,12 @@ import "./App.scss";
 function App() {
   return (
     <AuthProvider>
-      <Router>
+      <Router
+        future={{
+          v7_startTransition: true,
+          v7_relativeSplatPath: true,
+        }}
+      >
         <div id="App">
           <div id="wrap">
             <Routes>

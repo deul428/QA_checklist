@@ -38,7 +38,7 @@ const Checklist: React.FC = () => {
         const loadedInitialData: Record<number, "PASS" | "FAIL"> = {};
         const loadedInitialNotes: Record<number, string> = {};
         recordsData.forEach((record) => {
-          if (itemsData.some((item) => item.id == record.check_item_id)) {
+          if (itemsData.some((item) => item.id === record.check_item_id)) {
             loadedInitialData[record.check_item_id] = record.status as
               | "PASS"
               | "FAIL";
@@ -187,9 +187,8 @@ const Checklist: React.FC = () => {
           <>
             <div className="check-item-container">
               {checkItems.map((item, index) => (
-                <>
+                <React.Fragment key={item.id}>
                   <div
-                    key={item.id}
                     className="check-item"
                     style={{
                       borderBottom:
@@ -259,7 +258,7 @@ const Checklist: React.FC = () => {
                       ></div>
                     </>
                   )}
-                </>
+                </React.Fragment>
               ))}
             </div>
 
