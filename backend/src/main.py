@@ -791,17 +791,20 @@ async def export_excel(
         # 시스템, 항목, 담당자 매핑 생성
         system_map = {s.id: s.system_name for s in all_systems}
         item_map = {item.id: item for item in all_items}
+        
+        # (system_id, item_name) 조합으로 담당자 매핑 생성
         assignment_map = {}
         for assignment in all_assignments:
-            if assignment.system_id not in assignment_map:
-                assignment_map[assignment.system_id] = set()  # 중복 제거를 위해 set 사용
+            key = (assignment.system_id, assignment.item_name)
+            if key not in assignment_map:
+                assignment_map[key] = set()  # 중복 제거를 위해 set 사용
             user = next((u for u in all_users if u.id == assignment.user_id), None)
             if user:
-                assignment_map[assignment.system_id].add(user.name)  # 사번 제거, 이름만 사용
+                assignment_map[key].add(user.name)  # 사번 제거, 이름만 사용
         
         # set을 리스트로 변환 (정렬하여 일관성 유지)
-        for system_id in assignment_map:
-            assignment_map[system_id] = sorted(list(assignment_map[system_id]))
+        for key in assignment_map:
+            assignment_map[key] = sorted(list(assignment_map[key]))
         
         user_map = {u.id: u.name for u in all_users}
         
@@ -877,7 +880,9 @@ async def export_excel(
         row_idx = 2
         for data in excel_data:
             system_name = system_map.get(data['system_id'], "")
-            responsible_users = ", ".join(assignment_map.get(data['system_id'], []))
+            # (system_id, item_name) 조합으로 담당자 조회
+            assignment_key = (data['system_id'], data['item_name'])
+            responsible_users = ", ".join(assignment_map.get(assignment_key, []))
             
             ws.cell(row=row_idx, column=1, value=data['date'].strftime("%Y-%m-%d")).border = border
             ws.cell(row=row_idx, column=2, value=system_name).border = border
@@ -954,7 +959,7 @@ async def export_excel(
         if len(sorted_dates) > 0:
             chart = BarChart()
             chart.type = "col"
-            chart.style = 10
+            chart.style = 2
             chart.title = f"체크리스트 통계 ({request.start_date} ~ {request.end_date})"
             chart.y_axis.title = "개수"
             chart.x_axis.title = "날짜"

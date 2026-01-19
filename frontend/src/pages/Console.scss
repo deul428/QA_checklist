@@ -23,7 +23,9 @@ section {
   padding: 15px 20px;
   border-radius: 8px;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-  animation: slideIn 0.3s ease-out, fadeOut 0.3s ease-in 4.7s;
+  animation:
+    slideIn 0.3s ease-out,
+    fadeOut 0.3s ease-in 4.7s;
   animation-fill-mode: both;
 }
 section.btn-area {
@@ -184,6 +186,8 @@ section.fail-items-section {
     th,
     td {
       padding: 0.7rem $spacing-xs;
+      min-width: 150px;
+      max-width: 500px;
     }
     tr {
       border-collapse: unset;
@@ -215,8 +219,6 @@ section.fail-items-section {
           color: #888;
         }
         td {
-          min-width: 150px;
-          max-width: 500px;
           line-height: 1.5;
         }
       }
