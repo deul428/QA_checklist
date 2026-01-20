@@ -10,6 +10,8 @@ import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
 import Checklist from "./pages/Checklist";
 import Console from "./pages/Console";
+import Substitute from "./pages/Substitute";
+import Admin from "./pages/Admin";
 import ProtectedRoute from "./components/ProtectedRoute";
 import "./App.scss";
 
@@ -47,6 +49,22 @@ function App() {
                 element={
                   <ProtectedRoute>
                     <Console />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/substitute"
+                element={
+                  <ProtectedRoute>
+                    <Substitute />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/admin"
+                element={
+                  <ProtectedRoute>
+                    <Admin />
                   </ProtectedRoute>
                 }
               />

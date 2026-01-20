@@ -7,7 +7,7 @@ import "./Dashboard.scss";
 const Dashboard: React.FC = () => {
   const { user, logout, loading: authLoading } = useAuth();
   const navigate = useNavigate();
-  const [systems, setSystems] = useState<System[]>([]);
+  const [systems, setSystems] = useState<System[]>([]); 
   const [uncheckedCount, setUncheckedCount] = useState(0);
   const [checkedSystemIds, setCheckedSystemIds] = useState<Set<number>>(
     new Set()
@@ -33,7 +33,7 @@ const Dashboard: React.FC = () => {
         const uncheckedSystemIds = new Set(
           uncheckedData.map((item: any) => item.system_id)
         );
-        const allSystemIds = new Set(systemsData.map((s) => s.id));
+        const allSystemIds = new Set(systemsData.map((s) => s.system_id));
         const checkedIds = new Set(
           Array.from(allSystemIds).filter((id) => !uncheckedSystemIds.has(id))
         );
@@ -69,10 +69,16 @@ const Dashboard: React.FC = () => {
           <h1>DX본부 시스템 체크리스트 ({formattedDate})</h1>
           <div className="user-info">
             <span>
-              {user?.general_headquarters} {user?.name}님 (
-              {user?.employee_id})
+              {user?.general_headquarters} {user?.user_name}님 (
+              {user?.user_id})
             </span>
             <div className="btn-set">
+              <button
+                onClick={() => navigate("/substitute")}
+                className="btn btn-warning"
+              >
+                대체 담당자 지정
+              </button>
               {user?.console_role && (
                 <button
                   onClick={() => navigate("/console")}
@@ -102,16 +108,16 @@ const Dashboard: React.FC = () => {
         ) : (
           <div className="systems-grid">
             {systems.map((system) => {
-              const isChecked = checkedSystemIds.has(system.id);
+              const isChecked = checkedSystemIds.has(system.system_id);
               return (
                 <div
-                  key={system.id}
+                  key={system.system_id}
                   className={`system-card ${isChecked ? "checked" : ""}`}
-                  onClick={() => handleSystemClick(system.id)}
+                  onClick={() => handleSystemClick(system.system_id)}
                 >
                   <h3>{system.system_name}</h3>
-                  {system.description && (
-                    <p className="system-description">{system.description}</p>
+                  {system?.system_description && (
+                    <p className="system-description">{system?.system_description}</p>
                   )}
                   <div className="system-action">
                     {isChecked ? "✓ 체크 완료" : "체크리스트 작성 →"}

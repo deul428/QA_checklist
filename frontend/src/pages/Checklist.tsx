@@ -10,11 +10,11 @@ const Checklist: React.FC = () => {
   const [checklistData, setChecklistData] = useState<
     Record<number, "PASS" | "FAIL">
   >({});
-  const [notes, setNotes] = useState<Record<number, string>>({});
+  const [failNotes, setFailNotes] = useState<Record<number, string>>({});
   const [initialData, setInitialData] = useState<
     Record<number, "PASS" | "FAIL">
   >({});
-  const [initialNotes, setInitialNotes] = useState<Record<number, string>>({});
+  const [initialFailNotes, setInitialFailNotes] = useState<Record<number, string>>({});
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [message, setMessage] = useState<{
@@ -36,21 +36,21 @@ const Checklist: React.FC = () => {
 
         // 기존 기록이 있으면 불러오기
         const loadedInitialData: Record<number, "PASS" | "FAIL"> = {};
-        const loadedInitialNotes: Record<number, string> = {};
+        const loadedInitialFailNotes: Record<number, string> = {};
         recordsData.forEach((record) => {
-          if (itemsData.some((item) => item.id === record.check_item_id)) {
-            loadedInitialData[record.check_item_id] = record.status as
+          if (itemsData.some((item) => item.item_id === record.item_id)) {
+            loadedInitialData[record.item_id] = record.status as
               | "PASS"
               | "FAIL";
-            if (record.notes) {
-              loadedInitialNotes[record.check_item_id] = record.notes;
+            if (record.fail_notes) {
+              loadedInitialFailNotes[record.item_id] = record.fail_notes;
             }
           }
         });
         setChecklistData(loadedInitialData);
-        setNotes(loadedInitialNotes);
+        setFailNotes(loadedInitialFailNotes);
         setInitialData(loadedInitialData);
-        setInitialNotes(loadedInitialNotes);
+        setInitialFailNotes(loadedInitialFailNotes);
       } catch (error) {
         console.error("데이터 로딩 실패:", error);
         setMessage({
@@ -73,7 +73,7 @@ const Checklist: React.FC = () => {
   };
 
   const handleNoteChange = (itemId: number, note: string) => {
-    setNotes((prev) => ({
+    setFailNotes((prev) => ({
       ...prev,
       [itemId]: note,
     }));
@@ -83,7 +83,7 @@ const Checklist: React.FC = () => {
     if (!systemId) return;
 
     // 모든 항목이 체크되었는지 확인
-    const uncheckedItems = checkItems.filter((item) => !checklistData[item.id]);
+    const uncheckedItems = checkItems.filter((item) => !checklistData[item.item_id]);
 
     if (uncheckedItems.length > 0) {
       setMessage({
@@ -96,8 +96,8 @@ const Checklist: React.FC = () => {
     // FAIL 선택 항목 중 사유가 없는 항목 확인
     const failItemsWithoutReason = checkItems.filter(
       (item) =>
-        checklistData[item.id] === "FAIL" &&
-        (!notes[item.id] || notes[item.id].trim() === "")
+        checklistData[item.item_id] === "FAIL" &&
+        (!failNotes[item.item_id] || failNotes[item.item_id].trim() === "")
     );
 
     if (failItemsWithoutReason.length > 0) {
@@ -115,10 +115,10 @@ const Checklist: React.FC = () => {
       // 변경된 항목만 필터링하여 전송
       const submitItems: ChecklistSubmitItem[] = checkItems
         .filter((item) => {
-          const currentStatus = checklistData[item.id];
-          const currentNote = notes[item.id] || "";
-          const originalStatus = initialData[item.id];
-          const originalNote = initialNotes[item.id] || "";
+          const currentStatus = checklistData[item.item_id];
+          const currentNote = failNotes[item.item_id] || "";
+          const originalStatus = initialData[item.item_id];
+          const originalNote = initialFailNotes[item.item_id] || "";
 
           // 상태가 변경되었거나, 노트가 변경되었거나, 새로 추가된 항목인 경우
           return (
@@ -128,9 +128,9 @@ const Checklist: React.FC = () => {
           );
         })
         .map((item) => ({
-          check_item_id: item.id,
-          status: checklistData[item.id],
-          notes: notes[item.id] || undefined,
+          check_item_id: item.item_id,
+          status: checklistData[item.item_id],
+          fail_notes: failNotes[item.item_id] || undefined,
         }));
 
       // 변경된 항목이 없으면 저장하지 않음
@@ -187,16 +187,16 @@ const Checklist: React.FC = () => {
           <>
             <div className="check-item-container">
               {checkItems.map((item, index) => (
-                <React.Fragment key={item.id}>
+                <React.Fragment key={item.item_id}>
                   <div
                     className="check-item"
                     style={{
                       borderBottom:
-                        checklistData[item.id] === "FAIL"
+                        checklistData[item.item_id] === "FAIL"
                           ? "1px solid transparent"
                           : "1px solid #e8ddd4",
                       paddingBottom:
-                        checklistData[item.id] === "FAIL" ? "0" : "0.5rem",
+                        checklistData[item.item_id] === "FAIL" ? "0" : "0.5rem",
                     }}
                   >
                     <div className="check-item-header">
@@ -204,49 +204,41 @@ const Checklist: React.FC = () => {
                       <h4>{item.item_name}</h4>
                     </div>
                     <div className="item-description">
-                      <p>{item.description}</p>
+                      <p>{item.item_description}</p>
                     </div>
                     <div className="check-item-actions">
                       <div className="status-buttons">
                         <button
                           className={`status-btn ${
-                            checklistData[item.id] === "PASS"
+                            checklistData[item.item_id] === "PASS"
                               ? "active pass"
                               : ""
                           }`}
-                          onClick={() => handleStatusChange(item.id, "PASS")}
+                          onClick={() => handleStatusChange(item.item_id, "PASS")}
                         >
                           PASS
                         </button>
                         <button
                           className={`status-btn ${
-                            checklistData[item.id] === "FAIL"
+                            checklistData[item.item_id] === "FAIL"
                               ? "active fail"
                               : ""
                           }`}
-                          onClick={() => handleStatusChange(item.id, "FAIL")}
+                          onClick={() => handleStatusChange(item.item_id, "FAIL")}
                         >
                           FAIL
                         </button>
-                      </div>
-                      {/* <textarea
-                        className="notes-input"
-                        placeholder="특이사항이나 메모를 입력하세요 (선택사항)"
-                        value={notes[item.id] || ""}
-                        onChange={(e) =>
-                          handleNoteChange(item.id, e.target.value)
-                        }
-                      /> */}
+                      </div> 
                     </div>
                   </div>
-                  {checklistData[item.id] === "FAIL" && (
+                  {checklistData[item.item_id] === "FAIL" && (
                     <>
                       <textarea
                         className="notes-input"
                         placeholder="FAIL 사유를 입력하세요. (필수)"
-                        value={notes[item.id] || ""}
+                        value={failNotes[item.item_id] || ""}
                         onChange={(e) =>
-                          handleNoteChange(item.id, e.target.value)
+                          handleNoteChange(item.item_id, e.target.value)
                         }
                       />
                       <div

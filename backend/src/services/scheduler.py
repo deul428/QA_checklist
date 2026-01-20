@@ -150,7 +150,7 @@ def check_unchecked_items():
 
         # 체크되지 않은 항목 필터링
         unchecked_items = [
-            item for item in all_check_items if item.id not in checked_item_ids
+            item for item in all_check_items if item.item_id not in checked_item_ids
         ]
 
         if not unchecked_items:
@@ -171,12 +171,12 @@ def check_unchecked_items():
 
             # 담당자 정보 수집 (메일 발송용, 메일 본문에는 표시하지 않음)
             for assignment in assignments:
-                user = db.query(User).filter(User.id == assignment.user_id).first()
+                user = db.query(User).filter(User.user_id == assignment.user_id).first()
                 if user:
                     responsible_users.add(user)
 
             # 시스템별로 그룹화 (담당자 정보는 저장하지 않음)
-            system = db.query(System).filter(System.id == item.system_id).first()
+            system = db.query(System).filter(System.system_id == item.system_id).first()
             if system:
                 system_name = system.system_name
                 if system_name not in system_items:
@@ -198,12 +198,14 @@ def check_unchecked_items():
             recipient_names = ["테스트 이메일"]
             print(f"  [테스트 모드] 통합 메일을 {test_email}로 발송합니다")
         else:
-            recipient_emails = [user.email for user in responsible_users if user.email]
-            recipient_names = [user.name for user in responsible_users if user.email]
+            recipient_emails = [user.user_email for user in responsible_users if user.user_email]
+            recipient_names = [user.user_name for user in responsible_users if user.user_email]
             print(
                 f"  [스케줄러] 통합 메일을 {len(recipient_emails)}명의 담당자에게 발송합니다"
             )
-            print(f"    수신인: {', '.join([f'{name}({email})' for name, email in zip(recipient_names, recipient_emails)])}")
+            print(
+                f"    수신인: {', '.join([f'{name}({email})' for name, email in zip(recipient_names, recipient_emails)])}"
+            )
 
         # 참조: 담당자들의 팀장 및 DX본부 본부장
         cc_emails = []
@@ -214,32 +216,39 @@ def check_unchecked_items():
             for user in responsible_users:
                 if user.general_headquarters:
                     responsible_general_headquarters.add(user.general_headquarters)
-            
+
             # 팀장 찾기: 담당자와 같은 general_headquarters를 가진 팀장
             # 팀장은 division과 general_headquarters만 존재
             all_team_leaders = (
                 db.query(User)
                 .filter(
                     ((User.position == "팀장") | (User.role == "팀장"))
-                    & User.email.isnot(None)
+                    & user.user_email.isnot(None)
                 )
                 .all()
             )
-            
+
             # 담당자와 같은 general_headquarters를 가진 팀장 필터링
             if responsible_general_headquarters:
                 filtered_team_leaders = []
                 for tl in all_team_leaders:
-                    if tl.general_headquarters and tl.general_headquarters in responsible_general_headquarters:
+                    if (
+                        tl.general_headquarters
+                        and tl.general_headquarters in responsible_general_headquarters
+                    ):
                         filtered_team_leaders.append(tl)
                 team_leaders = filtered_team_leaders
-                print(f"    [참조] 담당자의 총괄본부: {responsible_general_headquarters}")
+                print(
+                    f"    [참조] 담당자의 총괄본부: {responsible_general_headquarters}"
+                )
                 print(f"    [참조] 매칭된 팀장: {len(team_leaders)}명")
             else:
                 # 담당자의 총괄본부 정보가 없으면 모든 팀장 포함
-                print(f"    [참고] 담당자의 총괄본부 정보가 없어 모든 팀장을 참조자로 추가합니다.")
+                print(
+                    f"    [참고] 담당자의 총괄본부 정보가 없어 모든 팀장을 참조자로 추가합니다."
+                )
                 team_leaders = all_team_leaders
-            
+
             # DX본부 본부장 찾기: division에 DX가 포함된 본부장
             # 본부장은 division만 존재
             dx_directors = (
@@ -247,50 +256,52 @@ def check_unchecked_items():
                 .filter(
                     ((User.position == "본부장") | (User.role == "본부장"))
                     & (User.division.like("%DX%"))
-                    & User.email.isnot(None)
+                    & user.user_email.isnot(None)
                 )
                 .all()
             )
-            
+
             # 참조자 수집: 담당자들의 팀장 + DX본부 본부장
             # 이메일 중복 체크 없이 단순히 팀장과 본부장을 참조자로 추가
             cc_emails = []
             cc_names = []
-            
+
             # 담당자들의 팀장 추가 (같은 총괄본부의 팀장)
             for tl in team_leaders:
-                if tl.email:
-                    cc_emails.append(tl.email)
-                    cc_names.append(tl.name)
-            
+                if tl.user_email:
+                    cc_emails.append(tl.user_email)
+                    cc_names.append(tl.user_name)
+
             # DX본부 본부장 추가 (무조건 참조자로 포함, 이메일 중복 무시)
             for director in dx_directors:
-                if director.email:
+                if director.user_email:
                     # 본부장은 무조건 참조자로 포함 (팀장과 같은 이메일이어도 포함)
-                    cc_emails.append(director.email)
-                    cc_names.append(director.name)
-                    print(f"    [참조] 본부장 추가: {director.name} ({director.email})")
-            
+                    cc_emails.append(director.user_email)
+                    cc_names.append(director.user_name)
+                    print(f"    [참조] 본부장 추가: {director.user_name} ({director.user_email})")
+
             print(
                 f"  [스케줄러] CC: {len(cc_emails)}명 (팀장 {len(team_leaders)}명, DX본부 본부장 {len(dx_directors)}명)"
             )
             if cc_emails:
-                print(f"    참조: {', '.join([f'{name}({email})' for name, email in zip(cc_names, cc_emails)])}")
+                print(
+                    f"    참조: {', '.join([f'{name}({email})' for name, email in zip(cc_names, cc_emails)])}"
+                )
 
         # 수신인 및 참조자 정보 (메일 본문용)
         recipient_info = ""
         cc_info = ""
         # if not is_test_mode:
-            # if recipient_names:
-            #     recipient_info = f"<p style='color: #666; font-size: 11px; margin-bottom: 10px;'><strong>수신인:</strong> {', '.join(recipient_names)}</p>"
-            # # 참조자 정보는 cc_names가 있을 때만 생성
-            # if cc_names:
-            #     cc_info = f"<p style='color: #666; font-size: 11px; margin-bottom: 10px;'><strong>참조:</strong> {', '.join(cc_names)}</p>"
-            #     print(f"    [디버깅] 메일 본문에 참조자 정보 추가: {len(cc_names)}명")
-            # else:
-            #     # 디버깅: 참조자가 없는 경우 로그 출력
-            #     print(f"    [디버깅] 참조자가 없어 메일 본문에 참조자 정보를 표시하지 않습니다. (cc_emails={len(cc_emails)}, cc_names={len(cc_names)})")
-        
+        # if recipient_names:
+        #     recipient_info = f"<p style='color: #666; font-size: 11px; margin-bottom: 10px;'><strong>수신인:</strong> {', '.join(recipient_names)}</p>"
+        # # 참조자 정보는 cc_names가 있을 때만 생성
+        # if cc_names:
+        #     cc_info = f"<p style='color: #666; font-size: 11px; margin-bottom: 10px;'><strong>참조:</strong> {', '.join(cc_names)}</p>"
+        #     print(f"    [디버깅] 메일 본문에 참조자 정보 추가: {len(cc_names)}명")
+        # else:
+        #     # 디버깅: 참조자가 없는 경우 로그 출력
+        #     print(f"    [디버깅] 참조자가 없어 메일 본문에 참조자 정보를 표시하지 않습니다. (cc_emails={len(cc_emails)}, cc_names={len(cc_names)})")
+
         # 통합 이메일 본문 생성
         email_body = f"""
             <html>
@@ -300,7 +311,9 @@ def check_unchecked_items():
                     {recipient_info if recipient_info else ''}
                     {cc_info if cc_info else ''}
                     <p>안녕하세요. DX본부 시스템 체크리스트 안내입니다.</p> 
+                    <br />
                     <p>주요 기능의 장애 예방을 위해 본 메일 수신 시 각 담당자분들께서는 미점검 상태로 남아 있는 시스템 체크리스트 항목을 확인하여 작성 부탁드립니다.</p>
+                    <br />
                     <p style="margin-bottom: 40px;">또한 정/부 담당자 모두 부재 예정인 경우에는, 점검이 누락되지 않도록 사전에 대체 담당자를 지정하여 점검을 진행해 주시기 바랍니다.</p>
                     <h3>[미점검 항목]</h3>
                     <table style="width: 100%; border-collapse: collapse; margin-top: 10px; margin-bottom: 20px;">
@@ -330,8 +343,7 @@ def check_unchecked_items():
                             </tr>
                     """
 
-        email_body += (
-            """
+        email_body += """
                         </tbody>
                     </table>
                     <br> 
@@ -340,13 +352,14 @@ def check_unchecked_items():
         </body>
         </html>
         """
-        )
 
         if recipient_emails:
             # 첫 번째 담당자 이메일을 To로, 나머지 담당자는 CC에 추가
             to_email = recipient_emails[0]
             # 나머지 담당자도 CC에 추가
-            remaining_recipients = recipient_emails[1:] if len(recipient_emails) > 1 else []
+            remaining_recipients = (
+                recipient_emails[1:] if len(recipient_emails) > 1 else []
+            )
             all_cc_emails = list(set(remaining_recipients + cc_emails))  # 중복 제거
 
             send_email(to_email, subject, email_body, cc_emails=all_cc_emails)
@@ -386,7 +399,7 @@ def send_test_email_scheduled():
 
         # 체크되지 않은 항목 필터링
         unchecked_items = [
-            item for item in all_check_items if item.id not in checked_item_ids
+            item for item in all_check_items if item.item_id not in checked_item_ids
         ]
 
         if not unchecked_items:
@@ -407,12 +420,12 @@ def send_test_email_scheduled():
 
                 # 담당자 정보 수집 (메일 발송용, 메일 본문에는 표시하지 않음)
                 for assignment in assignments:
-                    user = db.query(User).filter(User.id == assignment.user_id).first()
+                    user = db.query(User).filter(User.user_id == assignment.user_id).first()
                     if user:
                         responsible_users.add(user)
 
                 # 시스템별로 그룹화 (담당자 정보는 저장하지 않음)
-                system = db.query(System).filter(System.id == item.system_id).first()
+                system = db.query(System).filter(System.system_id == item.system_id).first()
                 if system:
                     system_name = system.system_name
                     if system_name not in system_items:
@@ -428,17 +441,21 @@ def send_test_email_scheduled():
             return
 
         # 수신인: 미점검 담당자 모두
-        recipient_emails = [user.email for user in responsible_users if user.email]
-        
+        recipient_emails = [user.user_email for user in responsible_users if user.user_email]
+
         if not recipient_emails:
             print(f"[테스트 메일] 담당자의 이메일 주소가 없습니다.")
             return
 
         # 수신인 이름 수집
-        recipient_names = [user.name for user in responsible_users if user.email]
-        
-        print(f"[테스트 메일] 통합 메일을 {len(recipient_emails)}명의 담당자에게 발송합니다")
-        print(f"  수신인: {', '.join([f'{name}({email})' for name, email in zip(recipient_names, recipient_emails)])}")
+        recipient_names = [user.user_name for user in responsible_users if user.user_email]
+
+        print(
+            f"[테스트 메일] 통합 메일을 {len(recipient_emails)}명의 담당자에게 발송합니다"
+        )
+        print(
+            f"  수신인: {', '.join([f'{name}({email})' for name, email in zip(recipient_names, recipient_emails)])}"
+        )
 
         # 참조: 담당자들의 팀장 및 DX본부 본부장
         # 담당자들의 총괄본부 정보 수집 (팀장 찾기용)
@@ -446,32 +463,37 @@ def send_test_email_scheduled():
         for user in responsible_users:
             if user.general_headquarters:
                 responsible_general_headquarters.add(user.general_headquarters)
-        
+
         # 팀장 찾기: 담당자와 같은 general_headquarters를 가진 팀장
         # 팀장은 division과 general_headquarters만 존재
         all_team_leaders = (
             db.query(User)
             .filter(
                 ((User.position == "팀장") | (User.role == "팀장"))
-                & User.email.isnot(None)
+                & user.user_email.isnot(None)
             )
             .all()
         )
-        
+
         # 담당자와 같은 general_headquarters를 가진 팀장 필터링
         if responsible_general_headquarters:
             filtered_team_leaders = []
             for tl in all_team_leaders:
-                if tl.general_headquarters and tl.general_headquarters in responsible_general_headquarters:
+                if (
+                    tl.general_headquarters
+                    and tl.general_headquarters in responsible_general_headquarters
+                ):
                     filtered_team_leaders.append(tl)
             team_leaders = filtered_team_leaders
             print(f"    [참조] 담당자의 총괄본부: {responsible_general_headquarters}")
             print(f"    [참조] 매칭된 팀장: {len(team_leaders)}명")
         else:
             # 담당자의 총괄본부 정보가 없으면 모든 팀장 포함
-            print(f"    [참고] 담당자의 총괄본부 정보가 없어 모든 팀장을 참조자로 추가합니다.")
+            print(
+                f"    [참고] 담당자의 총괄본부 정보가 없어 모든 팀장을 참조자로 추가합니다."
+            )
             team_leaders = all_team_leaders
-        
+
         # DX본부 본부장 찾기: division에 DX가 포함된 본부장
         # 본부장은 division만 존재
         dx_directors = (
@@ -479,33 +501,37 @@ def send_test_email_scheduled():
             .filter(
                 ((User.position == "본부장") | (User.role == "본부장"))
                 & (User.division.like("%DX%"))
-                & User.email.isnot(None)
+                & user.user_email.isnot(None)
             )
             .all()
         )
-        
+
         # 참조자 수집: 담당자들의 팀장 + DX본부 본부장
         # 이메일 중복 체크 없이 단순히 팀장과 본부장을 참조자로 추가
         cc_emails = []
         cc_names = []
-        
+
         # 담당자들의 팀장 추가 (같은 총괄본부의 팀장)
         for tl in team_leaders:
-            if tl.email:
-                cc_emails.append(tl.email)
-                cc_names.append(tl.name)
-        
+            if tl.user_email:
+                cc_emails.append(tl.user_email)
+                cc_names.append(tl.user_name)
+
         # DX본부 본부장 추가 (무조건 참조자로 포함, 이메일 중복 무시)
         for director in dx_directors:
-            if director.email:
+            if director.user_email:
                 # 본부장은 무조건 참조자로 포함 (팀장과 같은 이메일이어도 포함)
-                cc_emails.append(director.email)
-                cc_names.append(director.name)
-                print(f"    [참조] 본부장 추가: {director.name} ({director.email})")
-        
-        print(f"[테스트 메일] CC: {len(cc_emails)}명 (팀장 {len(team_leaders)}명, DX본부 본부장 {len(dx_directors)}명)")
+                cc_emails.append(director.user_email)
+                cc_names.append(director.user_name)
+                print(f"    [참조] 본부장 추가: {director.user_name} ({director.user_email})")
+
+        print(
+            f"[테스트 메일] CC: {len(cc_emails)}명 (팀장 {len(team_leaders)}명, DX본부 본부장 {len(dx_directors)}명)"
+        )
         if cc_emails:
-            print(f"  참조: {', '.join([f'{name}({email})' for name, email in zip(cc_names, cc_emails)])}")
+            print(
+                f"  참조: {', '.join([f'{name}({email})' for name, email in zip(cc_names, cc_emails)])}"
+            )
 
         # 수신인 및 참조자 정보 (메일 본문용)
         recipient_info = f"<p style='color: #666; font-size: 11px; margin-bottom: 10px;'><strong>수신인:</strong> {', '.join(recipient_names)}</p>"
@@ -514,7 +540,9 @@ def send_test_email_scheduled():
             cc_info = f"<p style='color: #666; font-size: 11px; margin-bottom: 10px;'><strong>참조:</strong> {', '.join(cc_names)}</p>"
         else:
             # 디버깅: 참조자가 없는 경우 로그 출력
-            print(f"    [참고] 참조자가 없어 메일 본문에 참조자 정보를 표시하지 않습니다.")
+            print(
+                f"    [참고] 참조자가 없어 메일 본문에 참조자 정보를 표시하지 않습니다."
+            )
 
         # 실제 메일과 동일한 형식의 이메일 본문 생성
         email_body = f"""
@@ -525,7 +553,9 @@ def send_test_email_scheduled():
                     {recipient_info}
                     {cc_info}
                     <p>안녕하세요. DX본부 시스템 체크리스트 안내입니다.</p> 
+                    <br />
                     <p>주요 기능의 장애 예방을 위해 본 메일 수신 시 각 담당자분들께서는 미점검 상태로 남아 있는 시스템 체크리스트 항목을 확인하여 작성 부탁드립니다.</p>
+                    <br />
                     <p style="margin-bottom: 40px;">또한 정/부 담당자 모두 부재 예정인 경우에는, 점검이 누락되지 않도록 사전에 대체 담당자를 지정하여 점검을 진행해 주시기 바랍니다.</p>
                     <h3>[미점검 항목]</h3>
                     <table style="width: 100%; border-collapse: collapse; margin-top: 10px; margin-bottom: 20px;">
@@ -556,8 +586,7 @@ def send_test_email_scheduled():
                             </tr>
                     """
 
-        email_body += (
-            """
+        email_body += """
                         </tbody>
                     </table>
                     <br>
@@ -566,7 +595,6 @@ def send_test_email_scheduled():
         </body>
         </html>
         """
-        )
 
         # 첫 번째 담당자 이메일을 To로, 나머지 담당자와 팀장/본부장은 CC로 설정
         to_email = recipient_emails[0]
@@ -641,14 +669,16 @@ def init_scheduler():
     # .env에서 스케줄 시간 읽기 (기본값: 09:00, 12:00)
     check_time_1 = os.getenv("CHECK_TIME_1", "09:00").strip()
     check_time_2 = os.getenv("CHECK_TIME_2", "12:00").strip()
-    
+
     # 시간 파싱 함수
     def parse_time(time_str):
         """HH:MM 형식의 시간 문자열을 파싱하여 (hour, minute) 튜플 반환"""
         try:
             parts = time_str.split(":")
             if len(parts) != 2:
-                raise ValueError("시간 형식이 올바르지 않습니다. HH:MM 형식을 사용하세요.")
+                raise ValueError(
+                    "시간 형식이 올바르지 않습니다. HH:MM 형식을 사용하세요."
+                )
             hour = int(parts[0])
             minute = int(parts[1])
             if not (0 <= hour <= 23 and 0 <= minute <= 59):
@@ -657,7 +687,7 @@ def init_scheduler():
         except (ValueError, IndexError) as e:
             print(f"시간 파싱 오류: {time_str} - {e}")
             return None, None
-    
+
     # 첫 번째 스케줄 시간 파싱 및 등록
     hour1, minute1 = parse_time(check_time_1)
     if hour1 is not None and minute1 is not None:
@@ -678,7 +708,7 @@ def init_scheduler():
             name="체크리스트 확인 (09:00)",
             replace_existing=True,
         )
-    
+
     # 두 번째 스케줄 시간 파싱 및 등록
     hour2, minute2 = parse_time(check_time_2)
     if hour2 is not None and minute2 is not None:
@@ -701,4 +731,6 @@ def init_scheduler():
         )
 
     scheduler.start()
-    print(f"스케줄러가 시작되었습니다. 매일 {check_time_1}, {check_time_2}에 미체크 항목을 확인합니다.")
+    print(
+        f"스케줄러가 시작되었습니다. 매일 {check_time_1}, {check_time_2}에 미체크 항목을 확인합니다."
+    )

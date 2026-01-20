@@ -276,6 +276,12 @@ const Console: React.FC = () => {
           <h1>체크리스트 통계</h1>
           <div className="btn-set">
             <button
+              onClick={() => navigate("/admin")}
+              className="btn btn-success"
+            >
+              시스템/항목 관리
+            </button>
+            <button
               onClick={() => navigate("/dashboard")}
               className="btn btn-accent"
             >
@@ -464,15 +470,19 @@ const Console: React.FC = () => {
                       <td>{item.system_name}</td>
                       <td>{item.item_name}</td>
                       <td>
-                        {item.user_name} ({item.employee_id})
+                        {item.user_name} ({item.user_id})
                       </td>
-                      <td>{item.notes || "-"}</td>
+                      <td>{item.fail_notes || "-"}</td>
                       <td>{formatDateTime(item.fail_time)}</td>
                       <td>
                         {item.is_resolved ? (
-                          <span className="btn status-badge resolved">해결됨</span>
+                          <span className="btn status-badge resolved">
+                            해결됨
+                          </span>
                         ) : (
-                          <span className="btn status-badge pending">미해결</span>
+                          <span className="btn status-badge pending">
+                            미해결
+                          </span>
                         )}
                       </td>
                       <td>

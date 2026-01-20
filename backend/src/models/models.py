@@ -6,10 +6,9 @@ from services.database import Base
 class User(Base):
     __tablename__ = "users"
     
-    id = Column(Integer, primary_key=True, index=True)
-    employee_id = Column(String(50), unique=True, nullable=False, index=True)
-    name = Column(String(100), nullable=False)
-    email = Column(String(255), nullable=False)
+    user_id = Column(String(50), primary_key=True, index=True)  # 사번을 primary key로 사용
+    user_name = Column(String(100), nullable=False)
+    user_email = Column(String(255), nullable=False)
     password_hash = Column(String(255), nullable=False)
     # 조직 정보
     division = Column(String(100), nullable=True)  # 부문 (본부장만 존재)
@@ -24,40 +23,43 @@ class User(Base):
 class System(Base):
     __tablename__ = "systems"
     
-    id = Column(Integer, primary_key=True, index=True)
+    system_id = Column(Integer, primary_key=True, index=True)
     system_name = Column(String(100), nullable=False)
-    description = Column(Text)
+    system_description = Column(Text)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
 class CheckItem(Base):
     __tablename__ = "check_items"
     
-    id = Column(Integer, primary_key=True, index=True)
-    system_id = Column(Integer, ForeignKey("systems.id", ondelete="CASCADE"), nullable=False)
+    item_id = Column(Integer, primary_key=True, index=True)
+    system_id = Column(Integer, ForeignKey("systems.system_id", ondelete="CASCADE"), nullable=False)
     item_name = Column(String(200), nullable=False)
-    description = Column(Text)
-    order_index = Column(Integer, default=0)
+    item_description = Column(Text)
+    status = Column(String(20), default="active", nullable=False)  # 'active' or 'deleted' (soft delete)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
+    
+    __table_args__ = (
+        CheckConstraint("status IN ('active', 'deleted')", name="check_item_status"),
+    )
 
 class UserSystemAssignment(Base):
     __tablename__ = "user_system_assignments"
     
-    id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
-    user_name = Column(String(100), nullable=False)  # 사용자 이름 (denormalization)
-    system_id = Column(Integer, ForeignKey("systems.id", ondelete="CASCADE"), nullable=False)
-    item_name = Column(String(200), nullable=False)  # 체크 항목 이름 (denormalization)
+    id = Column("assign_id", Integer, primary_key=True, index=True)
+    user_id = Column(String(50), ForeignKey("users.user_id", ondelete="CASCADE"), nullable=False)
+    system_id = Column(Integer, ForeignKey("systems.system_id", ondelete="CASCADE"), nullable=False)
+    item_id = Column(Integer, ForeignKey("check_items.item_id", ondelete="CASCADE"), nullable=False)  # 체크 항목 ID (외래 키)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
 class ChecklistRecord(Base):
     __tablename__ = "checklist_records"
     
-    id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
-    check_item_id = Column(Integer, ForeignKey("check_items.id", ondelete="CASCADE"), nullable=False)
+    records_id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(String(50), ForeignKey("users.user_id", ondelete="CASCADE"), nullable=False)
+    check_item_id = Column("item_id", Integer, ForeignKey("check_items.item_id", ondelete="CASCADE"), nullable=False)
     check_date = Column(Date, nullable=False)
     status = Column(String(10), nullable=False)
-    notes = Column(Text)
+    fail_notes = Column(Text)
     checked_at = Column(DateTime(timezone=True), server_default=func.now())
     
     __table_args__ = (
@@ -69,17 +71,67 @@ class ChecklistRecordLog(Base):
     __tablename__ = "checklist_records_logs"
     
     id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
-    check_item_id = Column(Integer, ForeignKey("check_items.id", ondelete="CASCADE"), nullable=False)
+    user_id = Column(String(50), ForeignKey("users.user_id", ondelete="CASCADE"), nullable=False)
+    check_item_id = Column(Integer, ForeignKey("check_items.item_id", ondelete="CASCADE"), nullable=False)
     check_date = Column(Date, nullable=False)
     status = Column(String(10), nullable=False)  # PASS or FAIL
-    notes = Column(Text)
+    fail_notes = Column(Text)
     action = Column(String(20), nullable=False)  # 'CREATE', 'UPDATE', 'DELETE'
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     
     __table_args__ = (
         CheckConstraint("status IN ('PASS', 'FAIL')", name="check_log_status"),
         CheckConstraint("action IN ('CREATE', 'UPDATE', 'DELETE')", name="check_log_action"),
+    )
+
+class SubstituteAssignment(Base):
+    """대체 담당자 할당 테이블 - 시스템 단위로 대체 담당자 요청"""
+    __tablename__ = "substitute_assignments"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    original_user_id = Column(String(50), ForeignKey("users.user_id", ondelete="CASCADE"), nullable=False)  # 원래 담당자
+    substitute_user_id = Column(String(50), ForeignKey("users.user_id", ondelete="CASCADE"), nullable=False)  # 대체 담당자
+    system_id = Column(Integer, ForeignKey("systems.system_id", ondelete="CASCADE"), nullable=False)  # 시스템 ID
+    start_date = Column(Date, nullable=False)  # 대체 시작일
+    end_date = Column(Date, nullable=False)  # 대체 종료일
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    
+    __table_args__ = (
+        CheckConstraint("end_date >= start_date", name="check_date_range"),
+    )
+
+class SubstituteAssignmentLog(Base):
+    """대체 담당자 할당 로그 테이블 - substitute_assignments의 모든 변경 이력 기록"""
+    __tablename__ = "substitute_assignments_logs"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    substitute_assignment_id = Column(Integer, ForeignKey("substitute_assignments.id", ondelete="SET NULL"), nullable=True)  # 삭제된 경우를 위해 nullable
+    action = Column(String(20), nullable=False)  # 'CREATE', 'UPDATE', 'DELETE'
+    changed_by_user_id = Column(String(50), ForeignKey("users.user_id", ondelete="SET NULL"), nullable=True)  # 변경한 사용자
+    old_data = Column(Text, nullable=True)  # 변경 전 데이터 (JSON 문자열)
+    new_data = Column(Text, nullable=True)  # 변경 후 데이터 (JSON 문자열)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    
+    __table_args__ = (
+        CheckConstraint("action IN ('CREATE', 'UPDATE', 'DELETE')", name="substitute_assignment_log_action"),
+    )
+
+class AdminLog(Base):
+    """관리자 작업 로그 테이블 - 시스템/항목/담당자 관리 작업 로그"""
+    __tablename__ = "admin_logs"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    admin_user_id = Column(String(50), ForeignKey("users.user_id", ondelete="SET NULL"), nullable=False)  # 작업한 관리자 (사용자 삭제 시에도 로그 보존)
+    action = Column(String(20), nullable=False)  # 'CREATE', 'UPDATE', 'DELETE'
+    entity_type = Column(String(50), nullable=False)  # 'system', 'check_item', 'assignment'
+    entity_id = Column(Integer, nullable=True)  # 대상 엔티티 ID (시스템 ID, 항목 ID, 배정 ID 등)
+    old_data = Column(Text, nullable=True)  # 변경 전 데이터 (JSON 문자열)
+    new_data = Column(Text, nullable=True)  # 변경 후 데이터 (JSON 문자열)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    
+    __table_args__ = (
+        CheckConstraint("action IN ('CREATE', 'UPDATE', 'DELETE')", name="admin_log_action"),
+        CheckConstraint("entity_type IN ('system', 'check_item', 'assignment')", name="admin_log_entity_type"),
     )
 
 # SpecialNote 모델은 더 이상 사용하지 않습니다.
@@ -89,7 +141,7 @@ class ChecklistRecordLog(Base):
 #     __tablename__ = "special_notes"
 #     
 #     id = Column(Integer, primary_key=True, index=True)
-#     check_item_id = Column(Integer, ForeignKey("check_items.id", ondelete="CASCADE"), nullable=False)
+#     check_item_id = Column(Integer, ForeignKey("check_items.item_id", ondelete="CASCADE"), nullable=False)
 #     note_text = Column(Text, nullable=False)
 #     is_active = Column(Boolean, default=True)
 #     created_at = Column(DateTime(timezone=True), server_default=func.now())

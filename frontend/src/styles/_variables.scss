@@ -12,9 +12,10 @@ $success-color: #28a745;
 $success-hover: #218838;
 $danger-color: #dc3545;
 $danger-hover: #c82333;
-$warning-color: #ffc107;
-$warning-bg: #fff3cd;
-$warning-text: #856404;
+$warning-color: #ffd042;
+$warning-hover: #ffc721;
+$warning-light-color: #fff2c8;
+$warning-light-hover: #ffdb67;
 $dark-color: #525252;
 $dark-hover: #3d3d3d;
 $light-color: #eee;
@@ -27,6 +28,7 @@ $text-muted: #8a9ba8; // 연한 그레이
 $text-dark: #333; // 어두운 그레이
 $text-white: #ffffff; // 메인 컬러 위 텍스트
 $text-on-accent: #856404; // 메인 컬러 위 텍스트
+$text-warning: #856404;
 
 // 배경 색상
 $bg-primary: #f6e7d3; // 베이지 배경

@@ -55,7 +55,11 @@ api.interceptors.response.use(
   (error) => {
     // 디버깅: 에러 정보 확인
     if (error.response) {
-      console.error("API Response Error:", error.response.status, error.response.data);
+      console.error(
+        "API Response Error:",
+        error.response.status,
+        error.response.data
+      );
     } else if (error.request) {
       console.error("API Request Failed - No Response:", error.request);
       console.error("Request URL:", error.config?.url);
@@ -63,7 +67,7 @@ api.interceptors.response.use(
     } else {
       console.error("API Error:", error.message);
     }
-    
+
     if (error.response?.status === 401) {
       localStorage.removeItem("token");
       localStorage.removeItem("user");
@@ -74,44 +78,45 @@ api.interceptors.response.use(
 );
 
 export interface User {
-  id: number;
-  employee_id: string;
-  division: string;
-  general_headquarters: string;
-  headquarters: string;
-  name: string;
-  email: string;
+  user_id: string;
+  user_name: string;
+  user_email: string;
+  division?: string;
+  general_headquarters?: string;
+  department?: string;
+  headquarters?: string;
+  position?: string;
+  role?: string;
   console_role: boolean;
 }
 
 export interface System {
-  id: number;
+  system_id: number;
   system_name: string;
-  description?: string;
+  system_description?: string;
 }
 
 export interface CheckItem {
-  id: number;
+  item_id: number;
   system_id: number;
   item_name: string;
-  description?: string;
-  order_index: number;
+  item_description?: string;
 }
 
 export interface ChecklistRecord {
-  id: number;
-  user_id: number;
-  check_item_id: number;
+  records_id: number;
+  user_id: string;
+  item_id: number;
   check_date: string;
   status: "PASS" | "FAIL";
-  notes?: string;
+  fail_notes?: string;
   checked_at: string;
 }
 
 export interface ChecklistSubmitItem {
   check_item_id: number;
   status: "PASS" | "FAIL";
-  notes?: string;
+  fail_notes?: string;
 }
 
 export const authAPI = {
@@ -135,6 +140,12 @@ export const userAPI = {
   },
   getSystems: async (): Promise<System[]> => {
     const response = await api.get("/api/user/systems");
+    return response.data;
+  },
+  searchUsers: async (query: string): Promise<User[]> => {
+    const response = await api.get("/api/user/search", {
+      params: { query },
+    });
     return response.data;
   },
 };
@@ -203,11 +214,10 @@ export interface ConsoleFailItem {
   system_name: string;
   check_item_id: number;
   item_name: string;
-  notes?: string;
+  fail_notes?: string;
   fail_time: string;
-  user_id: number;
+  user_id: string;
   user_name: string;
-  employee_id: string;
   is_resolved: boolean;
   resolved_date?: string;
   resolved_time?: string;
@@ -228,14 +238,135 @@ export const consoleAPI = {
     return response.data;
   },
   exportExcel: async (request: ExcelExportRequest): Promise<Blob> => {
-    const response = await api.post(
-      "/api/console/export-excel",
-      request,
-      {
-        responseType: "blob",
-      }
-    );
+    const response = await api.post("/api/console/export-excel", request, {
+      responseType: "blob",
+    });
     return response.data;
+  },
+};
+
+export interface CheckItem {
+  id: number;
+  system_id: number;
+  item_name: string;
+  item_description?: string;
+  status: "active" | "deleted";
+}
+
+export interface CheckItemCreate {
+  system_id: number;
+  item_name: string;
+  item_description?: string;
+}
+
+export interface CheckItemUpdate {
+  item_name?: string;
+  item_description?: string;
+}
+
+export interface Assignment {
+  id: number;
+  user_id: string;
+  user_name: string;
+  system_id: number;
+  system_name: string;
+  item_name: string;
+  created_at: string;
+}
+
+export interface AssignmentCreate {
+  system_id: number;
+  check_item_id: number;
+  user_ids: string[];
+}
+
+export interface SubstituteAssignment {
+  id: number;
+  original_user_id: string;
+  original_user_name: string;
+  substitute_user_id: string;
+  substitute_user_name: string;
+  system_id: number;
+  system_name: string;
+  start_date: string; // YYYY-MM-DD
+  end_date: string; // YYYY-MM-DD
+  created_at: string;
+  is_active: boolean;
+}
+
+export interface SubstituteAssignmentCreate {
+  substitute_user_id: string;
+  system_id: number;
+  start_date: string; // YYYY-MM-DD
+  end_date: string; // YYYY-MM-DD
+}
+
+export const adminAPI = {
+  getSystems: async (): Promise<System[]> => {
+    const response = await api.get("/api/admin/systems");
+    return response.data;
+  },
+  getCheckItems: async (systemId?: number): Promise<CheckItem[]> => {
+    const params = systemId ? { system_id: systemId } : {};
+    const response = await api.get("/api/admin/check-items", { params });
+    return response.data;
+  },
+  createCheckItem: async (data: CheckItemCreate): Promise<CheckItem> => {
+    const response = await api.post("/api/admin/check-items", data);
+    return response.data;
+  },
+  updateCheckItem: async (
+    itemId: number,
+    data: CheckItemUpdate
+  ): Promise<CheckItem> => {
+    const response = await api.put(`/api/admin/check-items/${itemId}`, data);
+    return response.data;
+  },
+  deleteCheckItem: async (itemId: number): Promise<void> => {
+    await api.delete(`/api/admin/check-items/${itemId}`);
+  },
+  getUsers: async (): Promise<User[]> => {
+    const response = await api.get("/api/admin/users");
+    return response.data;
+  },
+  getAssignments: async (
+    systemId?: number,
+    checkItemId?: number
+  ): Promise<Assignment[]> => {
+    const params: any = {};
+    if (systemId) params.system_id = systemId;
+    if (checkItemId) params.check_item_id = checkItemId;
+    const response = await api.get("/api/admin/assignments", { params });
+    return response.data;
+  },
+  createAssignments: async (
+    data: AssignmentCreate
+  ): Promise<{ message: string; created_count: number }> => {
+    const response = await api.post("/api/admin/assignments", data);
+    return response.data;
+  },
+  deleteAssignment: async (assignmentId: number): Promise<void> => {
+    await api.delete(`/api/admin/assignments/${assignmentId}`);
+  },
+};
+
+export const substituteAPI = {
+  create: async (
+    data: SubstituteAssignmentCreate
+  ): Promise<SubstituteAssignment> => {
+    const response = await api.post("/api/substitute/create", data);
+    return response.data;
+  },
+  list: async (): Promise<SubstituteAssignment[]> => {
+    const response = await api.get("/api/substitute/list");
+    return response.data;
+  },
+  getActive: async (): Promise<SubstituteAssignment[]> => {
+    const response = await api.get("/api/substitute/active");
+    return response.data;
+  },
+  delete: async (substituteId: number): Promise<void> => {
+    await api.delete(`/api/substitute/${substituteId}`);
   },
 };
 

@@ -3,7 +3,7 @@
 -- 사용자 테이블
 CREATE TABLE users (
     id SERIAL PRIMARY KEY,
-    employee_id VARCHAR(50) UNIQUE NOT NULL,  -- 사번
+    user_id VARCHAR(50) UNIQUE NOT NULL,  -- 사번
     name VARCHAR(100) NOT NULL,
     email VARCHAR(255) NOT NULL,
     password_hash VARCHAR(255) NOT NULL,
@@ -15,7 +15,7 @@ CREATE TABLE users (
 CREATE TABLE systems (
     id SERIAL PRIMARY KEY,
     system_name VARCHAR(100) NOT NULL,
-    description TEXT,
+    system_description TEXT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -24,7 +24,7 @@ CREATE TABLE check_items (
     id SERIAL PRIMARY KEY,
     system_id INTEGER REFERENCES systems(id) ON DELETE CASCADE,
     item_name VARCHAR(200) NOT NULL,
-    description TEXT,
+    item_description TEXT,
     order_index INTEGER DEFAULT 0,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
@@ -45,7 +45,7 @@ CREATE TABLE checklist_records (
     check_item_id INTEGER REFERENCES check_items(id) ON DELETE CASCADE,
     check_date DATE NOT NULL,
     status VARCHAR(10) NOT NULL CHECK (status IN ('PASS', 'FAIL')),
-    notes TEXT,
+    fail_notes TEXT,
     checked_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     UNIQUE(user_id, check_item_id, check_date)
 );

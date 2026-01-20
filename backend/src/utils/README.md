@@ -10,8 +10,8 @@
 
 ### 데이터베이스 관리
 - `create_views.py` - 데이터베이스 조회 편의를 위한 VIEW 생성
-- `backup_and_update_user_emails.py` - 사용자 이메일 백업 및 테스트용 변경
-- `restore_user_emails.py` - 백업된 사용자 이메일 복원
+- `backup_database.py` - 데이터베이스 백업
+- `generate_schema_documentation.py` - 데이터베이스 스키마 문서 생성
 
 ### 스케줄러 관리
 - `cancel_scheduled_job.py` - 예약된 스케줄 작업 취소
@@ -29,6 +29,12 @@ python backend/src/utils/import_user_copy_csv.py
 
 # VIEW 생성
 python backend/src/utils/create_views.py
+
+# 데이터베이스 백업
+python backend/src/utils/backup_database.py
+
+# 스키마 문서 생성
+python backend/src/utils/generate_schema_documentation.py
 
 # 스케줄 작업 취소
 python backend/src/utils/cancel_scheduled_job.py [job_id]
