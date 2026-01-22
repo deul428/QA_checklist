@@ -33,6 +33,9 @@ class SystemResponse(BaseModel):
     system_id: int
     system_name: str
     system_description: Optional[str] = None
+    has_dev: bool = False
+    has_stg: bool = False
+    has_prd: bool = False
 
     class Config:
         from_attributes = True
@@ -65,12 +68,14 @@ class AssignmentCreate(BaseModel):
     system_id: int
     check_item_id: int
     user_ids: List[str]  # 여러 명의 담당자 배정 가능 (user_id 리스트)
+    environment: str = "prd"  # 'dev', 'stg', 'prd'
 
 
 class CheckItemSubmit(BaseModel):
     check_item_id: int
     status: str  # PASS or FAIL
     fail_notes: Optional[str] = None
+    environment: str = "prd"  # 'dev', 'stg', 'prd'
 
 
 class ChecklistSubmit(BaseModel):
@@ -81,7 +86,9 @@ class ChecklistRecordResponse(BaseModel):
     records_id: int
     user_id: str
     check_item_id: int
+    system_id: Optional[int] = None  # 시스템 ID (denormalized)
     check_date: date
+    environment: str = "prd"  # 'dev', 'stg', 'prd'
     status: str
     fail_notes: Optional[str] = None
     checked_at: datetime
@@ -107,6 +114,7 @@ class ConsoleFailItemResponse(BaseModel):
     system_name: str
     check_item_id: int
     item_name: str
+    environment: str = "prd"  # 'dev', 'stg', 'prd'
     fail_notes: Optional[str] = None
     fail_time: datetime
     user_id: str

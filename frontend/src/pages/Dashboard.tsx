@@ -49,7 +49,8 @@ const Dashboard: React.FC = () => {
   }, [authLoading, user]); // authLoading과 user가 변경될 때마다 실행
 
   const handleSystemClick = (systemId: number) => {
-    navigate(`/checklist/${systemId}`);
+    // 기본 환경(prd)으로 체크리스트 페이지로 이동
+    navigate(`/checklist/${systemId}?env=prd`);
   };
 
   // AuthContext 로딩 중이거나 user가 없으면 로딩 표시

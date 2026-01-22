@@ -94,6 +94,9 @@ export interface System {
   system_id: number;
   system_name: string;
   system_description?: string;
+  has_dev: boolean;
+  has_stg: boolean;
+  has_prd: boolean;
 }
 
 export interface CheckItem {
@@ -106,8 +109,9 @@ export interface CheckItem {
 export interface ChecklistRecord {
   records_id: number;
   user_id: string;
-  item_id: number;
+  check_item_id: number;  // API 응답은 check_item_id를 반환함
   check_date: string;
+  environment: string; // 'dev', 'stg', 'prd'
   status: "PASS" | "FAIL";
   fail_notes?: string;
   checked_at: string;
@@ -117,6 +121,7 @@ export interface ChecklistSubmitItem {
   check_item_id: number;
   status: "PASS" | "FAIL";
   fail_notes?: string;
+  environment: string; // 'dev', 'stg', 'prd'
 }
 
 export const authAPI = {
@@ -151,20 +156,25 @@ export const userAPI = {
 };
 
 export const checklistAPI = {
-  getCheckItems: async (systemId: number): Promise<CheckItem[]> => {
-    const response = await api.get(`/api/systems/${systemId}/check-items`);
+  getCheckItems: async (systemId: number, environment: string = "prd"): Promise<CheckItem[]> => {
+    const response = await api.get(`/api/systems/${systemId}/check-items`, {
+      params: { environment },
+    });
     return response.data;
   },
-  getTodayChecklist: async (): Promise<ChecklistRecord[]> => {
-    const response = await api.get("/api/checklist/today");
+  getTodayChecklist: async (environment: string = "prd"): Promise<ChecklistRecord[]> => {
+    const response = await api.get("/api/checklist/today", {
+      params: { environment },
+    });
     return response.data;
   },
   submitChecklist: async (items: ChecklistSubmitItem[]) => {
     const response = await api.post("/api/checklist/submit", { items });
     return response.data;
   },
-  getUncheckedItems: async () => {
-    const response = await api.get("/api/checklist/unchecked");
+  getUncheckedItems: async (environment?: string) => {
+    const params = environment ? { environment } : {};
+    const response = await api.get("/api/checklist/unchecked", { params });
     return response.data;
   },
 };
@@ -214,6 +224,7 @@ export interface ConsoleFailItem {
   system_name: string;
   check_item_id: number;
   item_name: string;
+  environment: string; // 'dev', 'stg', 'prd'
   fail_notes?: string;
   fail_time: string;
   user_id: string;
@@ -229,12 +240,14 @@ export interface ExcelExportRequest {
 }
 
 export const consoleAPI = {
-  getStats: async (): Promise<ConsoleStats> => {
-    const response = await api.get("/api/console/stats");
+  getStats: async (environment?: string): Promise<ConsoleStats> => {
+    const params = environment ? { environment } : {};
+    const response = await api.get("/api/console/stats", { params });
     return response.data;
   },
-  getFailItems: async (): Promise<ConsoleFailItem[]> => {
-    const response = await api.get("/api/console/fail-items");
+  getFailItems: async (environment?: string): Promise<ConsoleFailItem[]> => {
+    const params = environment ? { environment } : {};
+    const response = await api.get("/api/console/fail-items", { params });
     return response.data;
   },
   exportExcel: async (request: ExcelExportRequest): Promise<Blob> => {
@@ -271,6 +284,7 @@ export interface Assignment {
   system_id: number;
   system_name: string;
   item_name: string;
+  environment: string; // 'dev', 'stg', 'prd'
   created_at: string;
 }
 
@@ -278,6 +292,7 @@ export interface AssignmentCreate {
   system_id: number;
   check_item_id: number;
   user_ids: string[];
+  environment: string; // 'dev', 'stg', 'prd'
 }
 
 export interface SubstituteAssignment {
@@ -306,8 +321,10 @@ export const adminAPI = {
     const response = await api.get("/api/admin/systems");
     return response.data;
   },
-  getCheckItems: async (systemId?: number): Promise<CheckItem[]> => {
-    const params = systemId ? { system_id: systemId } : {};
+  getCheckItems: async (systemId?: number, environment?: string): Promise<CheckItem[]> => {
+    const params: any = {};
+    if (systemId) params.system_id = systemId;
+    if (environment) params.environment = environment;
     const response = await api.get("/api/admin/check-items", { params });
     return response.data;
   },
@@ -331,11 +348,13 @@ export const adminAPI = {
   },
   getAssignments: async (
     systemId?: number,
-    checkItemId?: number
+    checkItemId?: number,
+    environment?: string
   ): Promise<Assignment[]> => {
     const params: any = {};
     if (systemId) params.system_id = systemId;
     if (checkItemId) params.check_item_id = checkItemId;
+    if (environment) params.environment = environment;
     const response = await api.get("/api/admin/assignments", { params });
     return response.data;
   },

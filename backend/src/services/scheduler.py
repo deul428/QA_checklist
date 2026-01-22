@@ -143,14 +143,15 @@ def check_unchecked_items():
         checked_records = (
             db.query(ChecklistRecord).filter(ChecklistRecord.check_date == today).all()
         )
-        checked_item_ids = {r.check_item_id for r in checked_records}
+        checked_item_ids = {(r.check_item_id, r.environment) for r in checked_records}
 
         # 모든 체크 항목 조회
-        all_check_items = db.query(CheckItem).all()
+        all_check_items = db.query(CheckItem).filter(CheckItem.status == "active").all()
 
-        # 체크되지 않은 항목 필터링
+        # 체크되지 않은 항목 필터링 (환경별로 구분)
         unchecked_items = [
-            item for item in all_check_items if item.item_id not in checked_item_ids
+            item for item in all_check_items 
+            if (item.item_id, item.environment) not in checked_item_ids
         ]
 
         if not unchecked_items:
@@ -162,10 +163,14 @@ def check_unchecked_items():
         system_items = {}  # {system_name: [item_name, ...]}
 
         for item in unchecked_items:
-            # 해당 항목의 담당자 조회
+            # 해당 항목의 담당자 조회 (환경별로 필터링)
             assignments = (
                 db.query(UserSystemAssignment)
-                .filter(UserSystemAssignment.system_id == item.system_id)
+                .filter(
+                    UserSystemAssignment.system_id == item.system_id,
+                    UserSystemAssignment.item_id == item.item_id,
+                    UserSystemAssignment.environment == item.environment,
+                )
                 .all()
             )
 
@@ -175,14 +180,15 @@ def check_unchecked_items():
                 if user:
                     responsible_users.add(user)
 
-            # 시스템별로 그룹화 (담당자 정보는 저장하지 않음)
+            # 시스템별로 그룹화 (환경 정보 포함)
             system = db.query(System).filter(System.system_id == item.system_id).first()
             if system:
                 system_name = system.system_name
-                if system_name not in system_items:
-                    system_items[system_name] = []
+                env_key = f"{system_name} ({item.environment.upper()})"
+                if env_key not in system_items:
+                    system_items[env_key] = []
                 # 항목 이름만 저장 (담당자 정보 제외)
-                system_items[system_name].append(item.item_name.strip())
+                system_items[env_key].append(item.item_name.strip())
 
         if not responsible_users:
             print(f"[스케줄러] 미체크 항목의 담당자가 없습니다.")
@@ -319,7 +325,7 @@ def check_unchecked_items():
                     <table style="width: 100%; border-collapse: collapse; margin-top: 10px; margin-bottom: 20px;">
                         <thead>
                             <tr style="background-color: #f5f5f5;">
-                                <th style="padding: 10px; text-align: left; border: 1px solid #ddd; font-size: 14px; font-weight: bold;">시스템</th>
+                                <th style="padding: 10px; text-align: left; border: 1px solid #ddd; font-size: 14px; font-weight: bold;">시스템 (환경)</th>
                                 <th style="padding: 10px; text-align: left; border: 1px solid #ddd; font-size: 14px; font-weight: bold;">항목</th>
                             </tr>
                         </thead>
@@ -392,14 +398,15 @@ def send_test_email_scheduled():
         checked_records = (
             db.query(ChecklistRecord).filter(ChecklistRecord.check_date == today).all()
         )
-        checked_item_ids = {r.check_item_id for r in checked_records}
+        checked_item_ids = {(r.check_item_id, r.environment) for r in checked_records}
 
         # 모든 체크 항목 조회
-        all_check_items = db.query(CheckItem).all()
+        all_check_items = db.query(CheckItem).filter(CheckItem.status == "active").all()
 
-        # 체크되지 않은 항목 필터링
+        # 체크되지 않은 항목 필터링 (환경별로 구분)
         unchecked_items = [
-            item for item in all_check_items if item.item_id not in checked_item_ids
+            item for item in all_check_items 
+            if (item.item_id, item.environment) not in checked_item_ids
         ]
 
         if not unchecked_items:
@@ -411,10 +418,14 @@ def send_test_email_scheduled():
             system_items = {}  # {system_name: [item_name, ...]}
 
             for item in unchecked_items:
-                # 해당 항목의 담당자 조회
+                # 해당 항목의 담당자 조회 (환경별로 필터링)
                 assignments = (
                     db.query(UserSystemAssignment)
-                    .filter(UserSystemAssignment.system_id == item.system_id)
+                    .filter(
+                        UserSystemAssignment.system_id == item.system_id,
+                        UserSystemAssignment.item_id == item.item_id,
+                        UserSystemAssignment.environment == item.environment,
+                    )
                     .all()
                 )
 
@@ -424,14 +435,20 @@ def send_test_email_scheduled():
                     if user:
                         responsible_users.add(user)
 
-                # 시스템별로 그룹화 (담당자 정보는 저장하지 않음)
+                # 시스템별로 그룹화 (환경 정보 포함)
                 system = db.query(System).filter(System.system_id == item.system_id).first()
                 if system:
                     system_name = system.system_name
-                    if system_name not in system_items:
-                        system_items[system_name] = []
+                    env_key = f"{system_name} ({item.environment.upper()})"
+                    if env_key not in system_items:
+                        system_items[env_key] = []
                     # 항목 이름만 저장 (담당자 정보 제외)
-                    system_items[system_name].append(item.item_name.strip())
+                    system_items[env_key].append(item.item_name.strip())
+                    env_key = f"{system_name} ({item.environment.upper()})"
+                    if env_key not in system_items:
+                        system_items[env_key] = []
+                    # 항목 이름만 저장 (담당자 정보 제외)
+                    system_items[env_key].append(item.item_name.strip())
 
         subject = f"[요청] 시스템 체크리스트 미점검 항목 확인 요청 ({today})"
 

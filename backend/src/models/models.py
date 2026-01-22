@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Text, Boolean, Date, DateTime, ForeignKey, CheckConstraint
+from sqlalchemy import Column, Integer, String, Text, Boolean, Date, DateTime, ForeignKey, CheckConstraint, UniqueConstraint
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from services.database import Base
@@ -26,6 +26,9 @@ class System(Base):
     system_id = Column(Integer, primary_key=True, index=True)
     system_name = Column(String(100), nullable=False)
     system_description = Column(Text)
+    has_dev = Column(Boolean, default=False, nullable=False)
+    has_stg = Column(Boolean, default=False, nullable=False)
+    has_prd = Column(Boolean, default=False, nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
 class CheckItem(Base):
@@ -40,6 +43,7 @@ class CheckItem(Base):
     
     __table_args__ = (
         CheckConstraint("status IN ('active', 'deleted')", name="check_item_status"),
+        UniqueConstraint("system_id", "item_name", name="uq_check_item_system_name"),
     )
 
 class UserSystemAssignment(Base):
@@ -49,7 +53,13 @@ class UserSystemAssignment(Base):
     user_id = Column(String(50), ForeignKey("users.user_id", ondelete="CASCADE"), nullable=False)
     system_id = Column(Integer, ForeignKey("systems.system_id", ondelete="CASCADE"), nullable=False)
     item_id = Column(Integer, ForeignKey("check_items.item_id", ondelete="CASCADE"), nullable=False)  # 체크 항목 ID (외래 키)
+    environment = Column(String(10), nullable=False, default="prd")  # 'dev', 'stg', 'prd'
     created_at = Column(DateTime(timezone=True), server_default=func.now())
+    
+    __table_args__ = (
+        CheckConstraint("environment IN ('dev', 'stg', 'prd')", name="check_assignment_environment"),
+        UniqueConstraint("user_id", "system_id", "item_id", "environment", name="uq_user_system_assignment"),
+    )
 
 class ChecklistRecord(Base):
     __tablename__ = "checklist_records"
@@ -57,13 +67,17 @@ class ChecklistRecord(Base):
     records_id = Column(Integer, primary_key=True, index=True)
     user_id = Column(String(50), ForeignKey("users.user_id", ondelete="CASCADE"), nullable=False)
     check_item_id = Column("item_id", Integer, ForeignKey("check_items.item_id", ondelete="CASCADE"), nullable=False)
+    system_id = Column(Integer, ForeignKey("systems.system_id", ondelete="CASCADE"), nullable=True)  # 시스템 ID (외래 키, 성능 향상을 위해 denormalized)
     check_date = Column(Date, nullable=False)
+    environment = Column(String(10), nullable=False, default="prd")  # 'dev', 'stg', 'prd'
     status = Column(String(10), nullable=False)
     fail_notes = Column(Text)
     checked_at = Column(DateTime(timezone=True), server_default=func.now())
     
     __table_args__ = (
         CheckConstraint("status IN ('PASS', 'FAIL')", name="check_status"),
+        CheckConstraint("environment IN ('dev', 'stg', 'prd')", name="check_record_environment"),
+        UniqueConstraint("item_id", "check_date", "environment", name="uq_checklist_record_item_date_env"),
     )
 
 class ChecklistRecordLog(Base):
@@ -73,7 +87,9 @@ class ChecklistRecordLog(Base):
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(String(50), ForeignKey("users.user_id", ondelete="CASCADE"), nullable=False)
     check_item_id = Column(Integer, ForeignKey("check_items.item_id", ondelete="CASCADE"), nullable=False)
+    system_id = Column(Integer, ForeignKey("systems.system_id", ondelete="CASCADE"), nullable=True)  # 시스템 ID (외래 키, 성능 향상을 위해 denormalized)
     check_date = Column(Date, nullable=False)
+    environment = Column(String(10), nullable=False, default="prd")  # 'dev', 'stg', 'prd'
     status = Column(String(10), nullable=False)  # PASS or FAIL
     fail_notes = Column(Text)
     action = Column(String(20), nullable=False)  # 'CREATE', 'UPDATE', 'DELETE'
@@ -82,6 +98,7 @@ class ChecklistRecordLog(Base):
     __table_args__ = (
         CheckConstraint("status IN ('PASS', 'FAIL')", name="check_log_status"),
         CheckConstraint("action IN ('CREATE', 'UPDATE', 'DELETE')", name="check_log_action"),
+        CheckConstraint("environment IN ('dev', 'stg', 'prd')", name="check_log_environment"),
     )
 
 class SubstituteAssignment(Base):

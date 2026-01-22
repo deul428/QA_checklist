@@ -1,11 +1,14 @@
 import React, { useEffect, useState } from "react";
-import { useParams, useNavigate } from "react-router-dom";
-import { checklistAPI, CheckItem, ChecklistSubmitItem } from "../api/api";
+import { useParams, useNavigate, useSearchParams } from "react-router-dom";
+import { checklistAPI, CheckItem, ChecklistSubmitItem, userAPI, System } from "../api/api";
 import "./Checklist.scss";
 
 const Checklist: React.FC = () => {
   const { systemId } = useParams<{ systemId: string }>();
+  const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
+  const [system, setSystem] = useState<System | null>(null);
+  const [environment, setEnvironment] = useState<string>("prd");
   const [checkItems, setCheckItems] = useState<CheckItem[]>([]);
   const [checklistData, setChecklistData] = useState<
     Record<number, "PASS" | "FAIL">
@@ -22,31 +25,54 @@ const Checklist: React.FC = () => {
     text: string;
   } | null>(null);
 
+  // URL 파라미터에서 environment 읽기
+  useEffect(() => {
+    const envParam = searchParams.get("env");
+    if (envParam && ["dev", "stg", "prd"].includes(envParam)) {
+      setEnvironment(envParam);
+    }
+  }, [searchParams]);
+
   useEffect(() => {
     const fetchData = async () => {
       if (!systemId) return;
 
       try {
+        setLoading(true);
+        // 시스템 정보 가져오기
+        const systemsData = await userAPI.getSystems();
+        const currentSystem = systemsData.find((s) => s.system_id === parseInt(systemId));
+        setSystem(currentSystem || null);
+
+        // 환경별 체크 항목 및 기록 가져오기
         const [itemsData, recordsData] = await Promise.all([
-          checklistAPI.getCheckItems(parseInt(systemId)),
-          checklistAPI.getTodayChecklist(),
+          checklistAPI.getCheckItems(parseInt(systemId), environment),
+          checklistAPI.getTodayChecklist(environment),
         ]);
 
         setCheckItems(itemsData);
-
+ 
         // 기존 기록이 있으면 불러오기
         const loadedInitialData: Record<number, "PASS" | "FAIL"> = {};
         const loadedInitialFailNotes: Record<number, string> = {};
         recordsData.forEach((record) => {
-          if (itemsData.some((item) => item.item_id === record.item_id)) {
-            loadedInitialData[record.item_id] = record.status as
+          // #region agent log
+          const recordCheckItemId = record.check_item_id;
+          const matched = itemsData.some((item) => item.item_id === recordCheckItemId && environment === record.environment);
+          fetch('http://127.0.0.1:7242/ingest/5de4ad51-04bc-4385-a7bf-b4eb070a53f2',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Checklist.tsx:59',message:'record matching attempt post-fix',data:{recordCheckItemId,environment:record.environment,matched,itemsInData:itemsData.map(i=>i.item_id)},timestamp:Date.now(),sessionId:'debug-session',runId:'post-fix',hypothesisId:'A'})}).catch(()=>{});
+          // #endregion
+          if (itemsData.some((item) => item.item_id === record.check_item_id && environment === record.environment)) {
+            loadedInitialData[record.check_item_id] = record.status as
               | "PASS"
               | "FAIL";
             if (record.fail_notes) {
-              loadedInitialFailNotes[record.item_id] = record.fail_notes;
+              loadedInitialFailNotes[record.check_item_id] = record.fail_notes;
             }
           }
         });
+        // #region agent log
+        fetch('http://127.0.0.1:7242/ingest/5de4ad51-04bc-4385-a7bf-b4eb070a53f2',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Checklist.tsx:68',message:'loadedInitialData result',data:{loadedCount:Object.keys(loadedInitialData).length,loadedData:loadedInitialData},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+        // #endregion
         setChecklistData(loadedInitialData);
         setFailNotes(loadedInitialFailNotes);
         setInitialData(loadedInitialData);
@@ -63,7 +89,7 @@ const Checklist: React.FC = () => {
     };
 
     fetchData();
-  }, [systemId]);
+  }, [systemId, environment]);
 
   const handleStatusChange = (itemId: number, status: "PASS" | "FAIL") => {
     setChecklistData((prev) => ({
@@ -131,6 +157,7 @@ const Checklist: React.FC = () => {
           check_item_id: item.item_id,
           status: checklistData[item.item_id],
           fail_notes: failNotes[item.item_id] || undefined,
+          environment: environment,
         }));
 
       // 변경된 항목이 없으면 저장하지 않음
@@ -162,6 +189,24 @@ const Checklist: React.FC = () => {
     return <div className="loading">로딩 중...</div>;
   }
 
+  // 사용 가능한 환경 목록
+  const availableEnvironments: string[] = [];
+  if (system) {
+    if (system.has_dev) availableEnvironments.push("dev");
+    if (system.has_stg) availableEnvironments.push("stg");
+    if (system.has_prd) availableEnvironments.push("prd");
+  }
+
+  const handleEnvironmentChange = (env: string) => {
+    setEnvironment(env);
+    setSearchParams({ env });
+    // 환경 변경 시 데이터 초기화
+    setChecklistData({});
+    setFailNotes({});
+    setInitialData({});
+    setInitialFailNotes({});
+  };
+
   return (
     <div className="checklist-page">
       <div className="checklist-header header">
@@ -177,6 +222,22 @@ const Checklist: React.FC = () => {
       {message && (
         <div className={`toast alert alert-${message.type}`}>
           {message.text}
+        </div>
+      )}
+
+      {/* 환경 선택 탭 */}
+      {system && availableEnvironments.length > 1 && (
+        <div className="environment-tabs" style={{ marginBottom: "20px", display: "flex", gap: "10px" }}>
+          {availableEnvironments.map((env) => (
+            <button
+              key={env}
+              onClick={() => handleEnvironmentChange(env)}
+              className={`btn ${environment === env ? "btn-primary" : "btn-secondary"}`}
+              style={{ textTransform: "uppercase" }}
+            >
+              {env.toUpperCase()}
+            </button>
+          ))}
         </div>
       )}
 

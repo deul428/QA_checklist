@@ -22,6 +22,7 @@ const Admin: React.FC = () => {
   const [assignments, setAssignments] = useState<Assignment[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedSystemId, setSelectedSystemId] = useState<number | null>(null); // null = '전체'
+  const [selectedEnvironment, setSelectedEnvironment] = useState<string | null>(null); // null = '전체'
   const [searchQuery, setSearchQuery] = useState<string>(""); // 항목 검색어
   const [message, setMessage] = useState<{
     type: "success" | "error";
@@ -80,15 +81,20 @@ const Admin: React.FC = () => {
 
   useEffect(() => {
     loadCheckItemsAndAssignments();
-  }, [selectedSystemId]);
+  }, [selectedSystemId, selectedEnvironment]);
 
   const loadCheckItemsAndAssignments = async () => {
     try {
       const [itemsData, assignmentsData] = await Promise.all([
-        selectedSystemId 
-          ? adminAPI.getCheckItems(selectedSystemId) 
-          : adminAPI.getCheckItems(), // 전체 시스템의 항목 가져오기
-        adminAPI.getAssignments(), // 전체 배정 데이터 가져오기 (시스템 내 항목별 담당자 리스트 전체)
+        adminAPI.getCheckItems(
+          selectedSystemId || undefined,
+          selectedEnvironment || undefined
+        ),
+        adminAPI.getAssignments(
+          selectedSystemId || undefined,
+          undefined,
+          selectedEnvironment || undefined
+        ),
       ]); 
       setCheckItems(itemsData);
       setAssignments(assignmentsData); // 전체 배정 데이터 저장
@@ -105,6 +111,16 @@ const Admin: React.FC = () => {
     const value = e.target.value;
     const systemId = value === "all" ? null : parseInt(value, 10);
     setSelectedSystemId(systemId);
+    setShowItemForm(false);
+    setShowAssignmentForm(false);
+    setEditingItem(null);
+    setSelectedItemId(null);
+  };
+
+  const handleEnvironmentChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const value = e.target.value;
+    const environment = value === "all" ? null : value;
+    setSelectedEnvironment(environment);
     setShowItemForm(false);
     setShowAssignmentForm(false);
     setEditingItem(null);
@@ -208,8 +224,13 @@ const Admin: React.FC = () => {
 
   const handleAssignUsers = (itemId: number) => {
     setSelectedItemId(itemId);
+    const item = checkItems.find((i) => i.item_id === itemId);
+    if (!item) return;
     const itemAssignments = assignments.filter(
-      (a) => a.item_name === checkItems.find((i) => i.item_id === itemId)?.item_name
+      (a) => 
+        a.item_name === item.item_name &&
+        a.system_id === item.system_id &&
+        a.environment === (selectedEnvironment || "prd")
     );
     setSelectedUserIds(itemAssignments.map((a) => a.user_id)); // user_id는 이미 user_id
     setShowAssignmentForm(true);
@@ -243,12 +264,14 @@ const Admin: React.FC = () => {
     }
 
     try {
-      // 기존 배정 삭제
+      // 기존 배정 삭제 (환경별로 필터링)
       const item = checkItems.find((i) => i.item_id === selectedItemId);
       if (item) {
         const existingAssignments = assignments.filter(
           (a) =>
-            a.item_name === item.item_name && a.system_id === item.system_id
+            a.item_name === item.item_name && 
+            a.system_id === item.system_id &&
+            a.environment === (selectedEnvironment || "prd")
         );
         for (const assignment of existingAssignments) {
           await adminAPI.deleteAssignment(assignment.id);
@@ -263,6 +286,7 @@ const Admin: React.FC = () => {
         system_id: item.system_id,
         check_item_id: selectedItemId,
         user_ids: selectedUserIds,
+        environment: selectedEnvironment || "prd",
       };
       await adminAPI.createAssignments(assignmentData);
       setMessage({
@@ -302,9 +326,12 @@ const Admin: React.FC = () => {
   };
 
   // 선택된 시스템의 특정 항목에 대한 배정 목록 조회
-  const getItemAssignments = (itemName: string, systemId: number) => {
+  const getItemAssignments = (itemName: string, systemId: number, environment?: string) => {
     return assignments.filter(
-      (a) => a.item_name === itemName && a.system_id === systemId
+      (a) => 
+        a.item_name === itemName && 
+        a.system_id === systemId &&
+        (environment ? a.environment === environment : true)
     );
   };
 
@@ -723,6 +750,21 @@ const Admin: React.FC = () => {
           </select>
         </section>
 
+        {/* 환경 선택 */}
+        <section className="admin-section">
+          <h2>환경 선택</h2>
+          <select
+            value={selectedEnvironment || "all"}
+            onChange={handleEnvironmentChange}
+            className="environment-select"
+          >
+            <option value="all">전체</option>
+            <option value="dev">DEV</option>
+            <option value="stg">STG</option>
+            <option value="prd">PRD</option>
+          </select>
+        </section>
+
         {/* 항목 관리 */}
             <section className="admin-section">
               <div className="section-header">
@@ -745,6 +787,7 @@ const Admin: React.FC = () => {
 
               {showItemForm && (
                 <div className="form-container">
+                  {/* 환경 선택 제거: check_items는 이제 environment와 무관 */}
                   <div className="form-group">
                     <label>항목 이름 *</label>
                     <input
@@ -859,10 +902,10 @@ const Admin: React.FC = () => {
                       )}
                       <div className="item-assignments">
                         {/* <strong>담당자:</strong> */}
-                        {getItemAssignments(item.item_name, item.system_id).length === 0 ? (
+                        {getItemAssignments(item.item_name, item.system_id, selectedEnvironment || undefined).length === 0 ? (
                           <span className="no-assignment">배정되지 않음</span>
                         ) : (
-                          getItemAssignments(item.item_name, item.system_id).map(
+                          getItemAssignments(item.item_name, item.system_id, selectedEnvironment || undefined).map(
                             (assignment) => (
                               <span
                                 key={assignment.id}
