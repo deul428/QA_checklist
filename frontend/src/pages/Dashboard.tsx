@@ -7,7 +7,7 @@ import "./Dashboard.scss";
 const Dashboard: React.FC = () => {
   const { user, logout, loading: authLoading } = useAuth();
   const navigate = useNavigate();
-  const [systems, setSystems] = useState<System[]>([]); 
+  const [systems, setSystems] = useState<System[]>([]);
   const [uncheckedCount, setUncheckedCount] = useState(0);
   const [checkedSystemIds, setCheckedSystemIds] = useState<Set<number>>(
     new Set()
@@ -21,9 +21,10 @@ const Dashboard: React.FC = () => {
 
     const fetchData = async () => {
       try {
+        // 기본 환경(prd)으로 체크되지 않은 항목 조회
         const [systemsData, uncheckedData] = await Promise.all([
           userAPI.getSystems(),
-          checklistAPI.getUncheckedItems(),
+          checklistAPI.getUncheckedItems("prd"),
         ]);
         setSystems(systemsData);
         setUncheckedCount(uncheckedData.length);
@@ -116,9 +117,9 @@ const Dashboard: React.FC = () => {
                   className={`system-card ${isChecked ? "checked" : ""}`}
                   onClick={() => handleSystemClick(system.system_id)}
                 >
-                  <h3>{system.system_name}</h3>
+                  <h4>{system.system_name}</h4>
                   {system?.system_description && (
-                    <p className="system-description">{system?.system_description}</p>
+                    <p className="system-description">testtest{system?.system_description}</p>
                   )}
                   <div className="system-action">
                     {isChecked ? "✓ 체크 완료" : "체크리스트 작성 →"}

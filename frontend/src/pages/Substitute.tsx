@@ -31,6 +31,7 @@ const Substitute: React.FC = () => {
   const [searchResults, setSearchResults] = useState<User[]>([]);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [searching, setSearching] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
   const [message, setMessage] = useState<{
     type: "success" | "error";
     text: string;
@@ -175,6 +176,7 @@ const Substitute: React.FC = () => {
       return;
     }
 
+    setSubmitting(true);
     try {
       await substituteAPI.create(formData);
       setMessage({
@@ -205,6 +207,8 @@ const Substitute: React.FC = () => {
         text:
           error.response?.data?.detail || "대체 담당자 지정에 실패했습니다.",
       });
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -275,7 +279,7 @@ const Substitute: React.FC = () => {
               {activeSubstitutes.map((sub) => (
                 <div key={sub.id} className="substitute-item active">
                   <div className="substitute-info">
-                    <h3>{sub.system_name}</h3>
+                    <h4>{sub.system_name}</h4>
                     <p>
                       원 담당자: {sub.original_user_name} → 대체 담당자:{" "}
                       {sub.substitute_user_name}
@@ -380,8 +384,12 @@ const Substitute: React.FC = () => {
                   />
                 </div>
               </div>
-              <button onClick={handleCreate} className="btn btn-success">
-                지정하기
+              <button 
+                onClick={handleCreate} 
+                className="btn btn-success"
+                disabled={submitting}
+              >
+                {submitting ? "로딩 중..." : "지정하기"}
               </button>
             </div>
           )}
@@ -397,7 +405,7 @@ const Substitute: React.FC = () => {
                 >
                   <div className="substitute-info">
                     <div className="substitute-header">
-                      <h3>{sub.system_name}</h3>
+                      <h4>{sub.system_name}</h4>
                       {sub.is_active && <span className="badge">활성</span>}
                     </div>
                     <p>

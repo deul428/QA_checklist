@@ -9,15 +9,21 @@ const Checklist: React.FC = () => {
   const navigate = useNavigate();
   const [system, setSystem] = useState<System | null>(null);
   const [environment, setEnvironment] = useState<string>("prd");
-  const [checkItems, setCheckItems] = useState<CheckItem[]>([]);
-  const [checklistData, setChecklistData] = useState<
-    Record<number, "PASS" | "FAIL">
+  // 환경별로 데이터 저장
+  const [checkItemsByEnv, setCheckItemsByEnv] = useState<Record<string, CheckItem[]>>({});
+  const [checklistDataByEnv, setChecklistDataByEnv] = useState<
+    Record<string, Record<number, "PASS" | "FAIL">>
   >({});
-  const [failNotes, setFailNotes] = useState<Record<number, string>>({});
-  const [initialData, setInitialData] = useState<
-    Record<number, "PASS" | "FAIL">
+  const [failNotesByEnv, setFailNotesByEnv] = useState<Record<string, Record<number, string>>>({});
+  const [initialDataByEnv, setInitialDataByEnv] = useState<
+    Record<string, Record<number, "PASS" | "FAIL">>
   >({});
-  const [initialFailNotes, setInitialFailNotes] = useState<Record<number, string>>({});
+  const [initialFailNotesByEnv, setInitialFailNotesByEnv] = useState<Record<string, Record<number, string>>>({});
+
+  // 현재 환경의 데이터 (computed)
+  const checkItems = checkItemsByEnv[environment] || [];
+  const checklistData = checklistDataByEnv[environment] || {};
+  const failNotes = failNotesByEnv[environment] || {};
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [message, setMessage] = useState<{
@@ -50,18 +56,31 @@ const Checklist: React.FC = () => {
           checklistAPI.getTodayChecklist(environment),
         ]);
 
-        setCheckItems(itemsData);
- 
+        // 환경별로 항목 저장 (기존 입력값 유지)
+        setCheckItemsByEnv((prev) => ({
+          ...prev,
+          [environment]: itemsData,
+        }));
+
         // 기존 기록이 있으면 불러오기
+        // getTodayChecklist는 사용자가 담당하는 모든 시스템의 기록을 반환하므로,
+        // 현재 시스템의 기록만 필터링해야 함
+        // 체크 기록은 환경별로 다르므로 environment도 확인해야 함
         const loadedInitialData: Record<number, "PASS" | "FAIL"> = {};
         const loadedInitialFailNotes: Record<number, string> = {};
+        const currentSystemId = parseInt(systemId);
+
         recordsData.forEach((record) => {
-          // #region agent log
-          const recordCheckItemId = record.check_item_id;
-          const matched = itemsData.some((item) => item.item_id === recordCheckItemId && environment === record.environment);
-          fetch('http://127.0.0.1:7242/ingest/5de4ad51-04bc-4385-a7bf-b4eb070a53f2',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Checklist.tsx:59',message:'record matching attempt post-fix',data:{recordCheckItemId,environment:record.environment,matched,itemsInData:itemsData.map(i=>i.item_id)},timestamp:Date.now(),sessionId:'debug-session',runId:'post-fix',hypothesisId:'A'})}).catch(()=>{});
-          // #endregion
-          if (itemsData.some((item) => item.item_id === record.check_item_id && environment === record.environment)) {
+          // 1. record의 environment가 현재 선택한 environment와 일치
+          // 2. record의 system_id가 현재 시스템과 일치 (또는 system_id가 없으면 item_id로 확인)
+          // 3. 해당 item_id가 현재 시스템의 항목 목록에 있는지 확인
+          const isEnvironmentMatch = record.environment === environment;
+          const isSystemMatch = record.system_id
+            ? record.system_id === currentSystemId
+            : itemsData.some((item) => item.item_id === record.check_item_id && item.system_id === currentSystemId);
+          const isItemMatch = itemsData.some((item) => item.item_id === record.check_item_id);
+
+          if (isEnvironmentMatch && isSystemMatch && isItemMatch) {
             loadedInitialData[record.check_item_id] = record.status as
               | "PASS"
               | "FAIL";
@@ -70,13 +89,36 @@ const Checklist: React.FC = () => {
             }
           }
         });
-        // #region agent log
-        fetch('http://127.0.0.1:7242/ingest/5de4ad51-04bc-4385-a7bf-b4eb070a53f2',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Checklist.tsx:68',message:'loadedInitialData result',data:{loadedCount:Object.keys(loadedInitialData).length,loadedData:loadedInitialData},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
-        // #endregion
-        setChecklistData(loadedInitialData);
-        setFailNotes(loadedInitialFailNotes);
-        setInitialData(loadedInitialData);
-        setInitialFailNotes(loadedInitialFailNotes);
+
+        // 환경별로 초기 데이터 저장 (기존 입력값은 유지)
+        setInitialDataByEnv((prev) => ({
+          ...prev,
+          [environment]: loadedInitialData,
+        }));
+        setInitialFailNotesByEnv((prev) => ({
+          ...prev,
+          [environment]: loadedInitialFailNotes,
+        }));
+
+        // 현재 환경의 입력값이 없으면 초기 데이터로 설정 (기존 입력값 유지)
+        setChecklistDataByEnv((prev) => {
+          if (!prev[environment]) {
+            return {
+              ...prev,
+              [environment]: loadedInitialData,
+            };
+          }
+          return prev; // 기존 입력값 유지
+        });
+        setFailNotesByEnv((prev) => {
+          if (!prev[environment]) {
+            return {
+              ...prev,
+              [environment]: loadedInitialFailNotes,
+            };
+          }
+          return prev; // 기존 입력값 유지
+        });
       } catch (error) {
         console.error("데이터 로딩 실패:", error);
         setMessage({
@@ -92,44 +134,83 @@ const Checklist: React.FC = () => {
   }, [systemId, environment]);
 
   const handleStatusChange = (itemId: number, status: "PASS" | "FAIL") => {
-    setChecklistData((prev) => ({
+    setChecklistDataByEnv((prev) => ({
       ...prev,
-      [itemId]: status,
+      [environment]: {
+        ...(prev[environment] || {}),
+        [itemId]: status,
+      },
     }));
   };
 
   const handleNoteChange = (itemId: number, note: string) => {
-    setFailNotes((prev) => ({
+    setFailNotesByEnv((prev) => ({
       ...prev,
-      [itemId]: note,
+      [environment]: {
+        ...(prev[environment] || {}),
+        [itemId]: note,
+      },
     }));
   };
 
   const handleSubmit = async () => {
     if (!systemId) return;
 
-    // 모든 항목이 체크되었는지 확인
-    const uncheckedItems = checkItems.filter((item) => !checklistData[item.item_id]);
+    // 모든 환경의 모든 항목이 체크되었는지 확인
+    const allUncheckedItems: Array<{ env: string; count: number }> = [];
+    Object.keys(checkItemsByEnv).forEach((env) => {
+      const items = checkItemsByEnv[env] || [];
+      const data = checklistDataByEnv[env] || {};
+      const unchecked = items.filter((item) => !data[item.item_id]);
+      if (unchecked.length > 0) {
+        allUncheckedItems.push({ env, count: unchecked.length });
+      }
+    });
 
-    if (uncheckedItems.length > 0) {
+    if (allUncheckedItems.length > 0) {
+      const envNameMap: Record<string, string> = {
+        dev: "개발계",
+        stg: "품질계",
+        prd: "운영계",
+      };
+      const uncheckedText = allUncheckedItems
+        .map(({ env, count }) => `${envNameMap[env]} ${count}개`)
+        .join(", ");
       setMessage({
         type: "error",
-        text: `모든 항목을 체크해 주세요. (${uncheckedItems.length}개 미체크)`,
+        text: `모든 항목을 체크해 주세요. (${uncheckedText} 미체크)`,
       });
       return;
     }
 
-    // FAIL 선택 항목 중 사유가 없는 항목 확인
-    const failItemsWithoutReason = checkItems.filter(
-      (item) =>
-        checklistData[item.item_id] === "FAIL" &&
-        (!failNotes[item.item_id] || failNotes[item.item_id].trim() === "")
-    );
+    // 모든 환경의 FAIL 선택 항목 중 사유가 없는 항목 확인
+    const allFailItemsWithoutReason: Array<{ env: string; count: number }> = [];
+    Object.keys(checkItemsByEnv).forEach((env) => {
+      const items = checkItemsByEnv[env] || [];
+      const data = checklistDataByEnv[env] || {};
+      const notes = failNotesByEnv[env] || {};
+      const failWithoutReason = items.filter(
+        (item) =>
+          data[item.item_id] === "FAIL" &&
+          (!notes[item.item_id] || notes[item.item_id].trim() === "")
+      );
+      if (failWithoutReason.length > 0) {
+        allFailItemsWithoutReason.push({ env, count: failWithoutReason.length });
+      }
+    });
 
-    if (failItemsWithoutReason.length > 0) {
+    if (allFailItemsWithoutReason.length > 0) {
+      const envNameMap: Record<string, string> = {
+        dev: "개발계",
+        stg: "품질계",
+        prd: "운영계",
+      };
+      const failText = allFailItemsWithoutReason
+        .map(({ env, count }) => `${envNameMap[env]} ${count}개`)
+        .join(", ");
       setMessage({
         type: "error",
-        text: `FAIL 선택 항목에 사유를 입력해 주세요. (${failItemsWithoutReason.length}개 미입력)`,
+        text: `FAIL 선택 항목에 사유를 입력해 주세요. (${failText} 미입력)`,
       });
       return;
     }
@@ -138,27 +219,37 @@ const Checklist: React.FC = () => {
     setMessage(null);
 
     try {
-      // 변경된 항목만 필터링하여 전송
-      const submitItems: ChecklistSubmitItem[] = checkItems
-        .filter((item) => {
-          const currentStatus = checklistData[item.item_id];
-          const currentNote = failNotes[item.item_id] || "";
+      // 모든 환경의 변경된 항목을 수집하여 전송
+      const submitItems: ChecklistSubmitItem[] = [];
+
+      Object.keys(checkItemsByEnv).forEach((env) => {
+        const items = checkItemsByEnv[env] || [];
+        const data = checklistDataByEnv[env] || {};
+        const notes = failNotesByEnv[env] || {};
+        const initialData = initialDataByEnv[env] || {};
+        const initialNotes = initialFailNotesByEnv[env] || {};
+
+        items.forEach((item) => {
+          const currentStatus = data[item.item_id];
+          const currentNote = notes[item.item_id] || "";
           const originalStatus = initialData[item.item_id];
-          const originalNote = initialFailNotes[item.item_id] || "";
+          const originalNote = initialNotes[item.item_id] || "";
 
           // 상태가 변경되었거나, 노트가 변경되었거나, 새로 추가된 항목인 경우
-          return (
+          if (
             currentStatus !== originalStatus ||
             currentNote !== originalNote ||
             (currentStatus && !originalStatus)
-          );
-        })
-        .map((item) => ({
-          check_item_id: item.item_id,
-          status: checklistData[item.item_id],
-          fail_notes: failNotes[item.item_id] || undefined,
-          environment: environment,
-        }));
+          ) {
+            submitItems.push({
+              check_item_id: item.item_id,
+              status: currentStatus,
+              fail_notes: currentNote || undefined,
+              environment: env,
+            });
+          }
+        });
+      });
 
       // 변경된 항목이 없으면 저장하지 않음
       if (submitItems.length === 0) {
@@ -171,8 +262,35 @@ const Checklist: React.FC = () => {
 
       await checklistAPI.submitChecklist(submitItems);
 
+      // 저장된 환경 목록
+      const savedEnvs = Array.from(new Set(submitItems.map((item) => item.environment)));
+      const envNameMap: Record<string, string> = {
+        dev: "개발계",
+        stg: "품질계",
+        prd: "운영계",
+      };
+      const savedEnvNames = savedEnvs.map((env) => envNameMap[env] || env).join(", ");
+
+      // 저장 성공 후 토스트 알림 표시
+      setMessage({
+        type: "success",
+        text: `체크리스트가 저장되었습니다.`,
+      });
+
+      // 저장 성공 후 초기 데이터 업데이트 (다음 변경사항 감지를 위해)
+      const updatedInitialDataByEnv = { ...initialDataByEnv };
+      const updatedInitialFailNotesByEnv = { ...initialFailNotesByEnv };
+
+      Object.keys(checkItemsByEnv).forEach((env) => {
+        updatedInitialDataByEnv[env] = { ...checklistDataByEnv[env] };
+        updatedInitialFailNotesByEnv[env] = { ...failNotesByEnv[env] };
+      });
+
+      setInitialDataByEnv(updatedInitialDataByEnv);
+      setInitialFailNotesByEnv(updatedInitialFailNotesByEnv);
+
       // 저장 성공 후 대시보드로 이동
-      navigate("/dashboard");
+      // navigate("/dashboard");
     } catch (error: any) {
       setMessage({
         type: "error",
@@ -200,11 +318,7 @@ const Checklist: React.FC = () => {
   const handleEnvironmentChange = (env: string) => {
     setEnvironment(env);
     setSearchParams({ env });
-    // 환경 변경 시 데이터 초기화
-    setChecklistData({});
-    setFailNotes({});
-    setInitialData({});
-    setInitialFailNotes({});
+    // 환경 변경 시 데이터 초기화하지 않음 (입력값 보존)
   };
 
   return (
@@ -228,16 +342,27 @@ const Checklist: React.FC = () => {
       {/* 환경 선택 탭 */}
       {system && availableEnvironments.length > 1 && (
         <div className="environment-tabs" style={{ marginBottom: "20px", display: "flex", gap: "10px" }}>
-          {availableEnvironments.map((env) => (
-            <button
-              key={env}
-              onClick={() => handleEnvironmentChange(env)}
-              className={`btn ${environment === env ? "btn-primary" : "btn-secondary"}`}
-              style={{ textTransform: "uppercase" }}
-            >
-              {env.toUpperCase()}
-            </button>
-          ))}
+          {availableEnvironments.map((env) => {
+            const isActive = environment === env;
+            const envLower = env.toLowerCase();
+            const btnClass = "btn-primary"/*  envLower.includes('dev') 
+              ? (envLower.includes('stg') ? "btn-warning" : "btn-danger") 
+              : "btn-primary"; */
+            return (
+              <button
+                key={env}
+                onClick={() => handleEnvironmentChange(env)}
+                className={`btn ${btnClass} ${isActive ? 'active' : ''}`}
+                style={isActive ? {
+                  opacity: 1,
+                  // transform: 'scale(1.05)',
+                  // boxShadow: '0 2px 4px rgba(0,0,0,0.2)'
+                } : {}}
+              >
+                {envLower.includes('dev') ? "개발계" : envLower.includes('stg') ? "품질계" : "운영계"}
+              </button>
+            );
+          })}
         </div>
       )}
 
@@ -262,7 +387,7 @@ const Checklist: React.FC = () => {
                   >
                     <div className="check-item-header">
                       <span className="item-number">{index + 1}</span>
-                      <h4>{item.item_name}</h4>
+                      <h5>{item.item_name}</h5>
                     </div>
                     <div className="item-description">
                       <p>{item.item_description}</p>
@@ -270,26 +395,24 @@ const Checklist: React.FC = () => {
                     <div className="check-item-actions">
                       <div className="status-buttons">
                         <button
-                          className={`status-btn ${
-                            checklistData[item.item_id] === "PASS"
-                              ? "active pass"
-                              : ""
-                          }`}
+                          className={`status-btn ${checklistData[item.item_id] === "PASS"
+                            ? "active pass"
+                            : ""
+                            }`}
                           onClick={() => handleStatusChange(item.item_id, "PASS")}
                         >
                           PASS
                         </button>
                         <button
-                          className={`status-btn ${
-                            checklistData[item.item_id] === "FAIL"
-                              ? "active fail"
-                              : ""
-                          }`}
+                          className={`status-btn ${checklistData[item.item_id] === "FAIL"
+                            ? "active fail"
+                            : ""
+                            }`}
                           onClick={() => handleStatusChange(item.item_id, "FAIL")}
                         >
                           FAIL
                         </button>
-                      </div> 
+                      </div>
                     </div>
                   </div>
                   {checklistData[item.item_id] === "FAIL" && (

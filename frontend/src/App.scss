@@ -7,20 +7,38 @@
   align-items: center;
   justify-content: center;
 }
+
 h1 {
-  font-size: $font-size-xl;
-  font-weight: 700;
-}
-h2 {
-  font-size: $font-size-lg;
+  font-size: $font-size-xxl;
   font-weight: 700;
   color: $primary-color;
-  margin-bottom: $spacing-md;
 }
+
+h2 {
+  font-size: $font-size-xl;
+  font-weight: 700;
+  margin-bottom: $spacing-md;
+  color: $text-primary;
+}
+
 h3 {
+  font-size: $font-size-lg;
+  font-weight: 700;
+  color: $text-accent;
+}
+
+h4 {
+  font-size: $font-size-md;
+  font-weight: 700;
+  color: $text-primary;
+}
+
+h5 {
   font-size: $font-size-base;
   font-weight: 700;
+  color: $text-primary;
 }
+
 #wrap {
   width: calc(70dvw - 4rem);
   height: calc(100dvh - 4rem);
@@ -28,6 +46,20 @@ h3 {
   border-radius: $border-radius-lg;
   background: #fff;
   overflow-y: auto;
+
+  // 태블릿
+  @media (max-width: 1024px) {
+    width: calc(85dvw - 2rem);
+    padding: 1.5rem;
+  }
+
+  // 모바일
+  @media (max-width: 768px) {
+    width: 100dvw;
+    height: 100dvh;
+    padding: 1rem;
+    border-radius: 0;
+  }
 }
 
 // 카드 컴포넌트
@@ -36,12 +68,7 @@ h3 {
   margin-bottom: $spacing-md;
 }
 
-input[type="checkbox"] {
-  margin-right: $spacing-xs;
-  height: 1rem;
-  width: 1rem;
-  cursor: pointer;
-}
+
 // 버튼 컴포넌트
 .btn {
   @include button-base;
@@ -58,6 +85,7 @@ input[type="checkbox"] {
   &-dark {
     @include button-variant($dark-color, $text-white, $dark-hover);
   }
+
   &-light {
     @include button-variant($light-color, $text-dark, $light-hover);
     // box-shadow: $shadow-sm;
@@ -73,16 +101,15 @@ input[type="checkbox"] {
   }
 
   &-warning-light {
-    @include button-variant(
-      $warning-light-color,
+    @include button-variant($warning-light-color,
       $text-warning,
-      $warning-light-hover
-    );
+      $warning-light-hover );
   }
 
   &-danger {
     @include button-variant($danger-color, $text-white, $danger-hover);
   }
+
   &-accent {
     @include button-variant($accent-color, $primary-color, $accent-light);
   }
@@ -97,15 +124,36 @@ input[type="checkbox"] {
     font-weight: 600;
   }
 }
+
+section {
+  border-top: 1px solid $border-color;
+  padding-top: $spacing-sm;
+  margin-top: $spacing-sm;
+
+  &:first-child {
+    border-top: none;
+    padding-top: 0;
+    margin-top: 0;
+  }
+}
+
 .label {
   display: block;
   margin-bottom: $spacing-xs;
   font-weight: 500;
   color: $text-primary;
 }
+
 input {
   @include input-base;
   height: 40px;
+
+  &[type="checkbox"] {
+    margin-right: $spacing-xs;
+    height: 1rem !important;
+    width: 1rem !important;
+    cursor: pointer;
+  }
 }
 
 // Select 및 Option 커스텀 스타일 (search-result-item 스타일 참고)
@@ -162,6 +210,7 @@ option {
     color: $text-white;
   }
 }
+
 // 알림 컴포넌트
 .alert {
   &-success {
@@ -181,6 +230,7 @@ option {
   display: flex;
   gap: $spacing-sm;
 }
+
 .header {
   display: flex;
   align-items: center;
@@ -192,19 +242,40 @@ option {
   border-bottom: 1px solid $primary-color;
   padding: 0;
   padding-bottom: 1.5rem;
+
   h1 {
     color: $primary-color;
     font-size: $font-size-xxl;
     margin: 0;
+
+    // 태블릿
+    @media (max-width: 1024px) {
+      font-size: $font-size-xl;
+    }
+
+    // 모바일
+    @media (max-width: 768px) {
+      font-size: $font-size-lg;
+    }
   }
+
   .header-content {
     width: 100%;
     display: flex;
     justify-content: space-between;
     align-items: center;
     margin: 0;
+    flex-wrap: wrap;
+    gap: $spacing-sm;
+
+    // 모바일
+    @media (max-width: 768px) {
+      flex-direction: column;
+      align-items: flex-start;
+    }
   }
 }
+
 // 공통 상태 컴포넌트
 .loading {
   text-align: center;
@@ -226,6 +297,7 @@ option {
   justify-content: space-between;
   align-items: center;
   margin-bottom: $spacing-sm;
+
   h2 {
     margin-bottom: 0;
   }

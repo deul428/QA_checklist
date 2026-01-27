@@ -59,15 +59,9 @@ def send_email(to_email: str, subject: str, body: str, cc_emails: list = None):
         print("SMTP 설정이 없어 이메일을 발송할 수 없습니다")
         return
 
-    # 디버깅 정보 출력
-    print(f"SMTP 연결 정보:")
-    print(f"  서버: {smtp_host}:{smtp_port}")
-    print(f"  사용자: {smtp_user}")
-    print(f"  발신자: {smtp_from}")
-    print(f"  수신자: {to_email}")
-    if cc_emails:
-        print(f"  CC: {', '.join(cc_emails)}")
-    print(f"  SSL 사용: {smtp_use_ssl}")
+    # 디버깅 정보 출력 (간소화)
+    cc_info = f", CC: {len(cc_emails)}명" if cc_emails else ""
+    print(f"[메일 발송] {smtp_user} → {to_email}{cc_info}")
 
     try:
         msg = MIMEMultipart()
@@ -102,11 +96,54 @@ def send_email(to_email: str, subject: str, body: str, cc_emails: list = None):
         recipients = [to_email]
         if cc_emails:
             recipients.extend(cc_emails)
-        server.send_message(msg, to_addrs=recipients)
-        server.quit()
-
-        cc_info = f" (CC: {', '.join(cc_emails)})" if cc_emails else ""
-        print(f"이메일 발송 완료: {to_email}{cc_info}")
+        
+        # 메일 발송 (실제 발송 여부 확인)
+        try:
+            result = server.send_message(msg, to_addrs=recipients)
+            server.quit()
+            
+            # 발송 결과 확인
+            if result:
+                failed_recipients = result
+                if failed_recipients:
+                    print(f"이메일 발송 실패: 일부 수신자에게 발송 실패")
+                    print(f"  실패한 수신자: {failed_recipients}")
+                else:
+                    cc_info = f" (CC: {len(cc_emails)}명)" if cc_emails else ""
+                    print(f"✓ 이메일 발송 성공: {to_email}{cc_info}")
+            else:
+                cc_info = f" (CC: {len(cc_emails)}명)" if cc_emails else ""
+                print(f"✓ 이메일 발송 성공: {to_email}{cc_info}")
+        except Exception as send_error:
+            server.quit()
+            raise send_error
+    except smtplib.SMTPAuthenticationError as e:
+        print(f"이메일 발송 실패: SMTP 인증 오류")
+        print(f"  오류 코드: {e.smtp_code}")
+        print(f"  오류 메시지: {e.smtp_error.decode('utf-8') if isinstance(e.smtp_error, bytes) else e.smtp_error}")
+        if "gmail.com" in smtp_host.lower():
+            print("\n[Gmail 인증 문제 해결 방법]")
+            print("1. Gmail 계정에서 2단계 인증이 활성화되어 있는지 확인하세요.")
+            print("2. Google 계정 설정 > 보안 > 2단계 인증 > 앱 비밀번호에서 앱 비밀번호를 생성하세요.")
+            print("3. 생성된 앱 비밀번호를 .env 파일의 SMTP_PASSWORD에 설정하세요.")
+            print("4. 일반 비밀번호가 아닌 앱 비밀번호를 사용해야 합니다.")
+        import traceback
+        traceback.print_exc()
+    except smtplib.SMTPDataError as e:
+        error_msg = e.smtp_error.decode('utf-8') if isinstance(e.smtp_error, bytes) else str(e.smtp_error)
+        print(f"이메일 발송 실패: SMTP 데이터 오류")
+        print(f"  오류 코드: {e.smtp_code}")
+        print(f"  오류 메시지: {error_msg}")
+        if "gmail.com" in smtp_host.lower() and "Daily user sending limit" in error_msg:
+            print("\n[Gmail 일일 발송 한도 초과 문제 해결 방법]")
+            print("Gmail 무료 계정은 하루에 약 500개의 이메일만 보낼 수 있습니다.")
+            print("해결 방법:")
+            print("1. 24시간 후에 다시 시도하세요.")
+            print("2. Gmail Workspace(구 G Suite) 계정을 사용하면 더 높은 한도가 있습니다.")
+            print("3. 여러 수신자에게 보낼 때는 BCC를 사용하거나, 수신자를 그룹으로 묶어서 보내세요.")
+            print("4. 회사 이메일 서버(SMTP)를 사용하는 것을 권장합니다.")
+        import traceback
+        traceback.print_exc()
     except Exception as e:
         print(f"이메일 발송 실패: {e}")
         import traceback
@@ -160,16 +197,15 @@ def check_unchecked_items():
 
         # 미체크 항목의 담당자 수집
         responsible_users = set()
-        system_items = {}  # {system_name: [item_name, ...]}
+        system_items = {}  # {system_name: set(item_name, ...)} - 항목명 기준 중복 제거
 
         for item in unchecked_items:
-            # 해당 항목의 담당자 조회 (환경별로 필터링)
+            # 해당 항목의 담당자 조회 (환경 무관하게 배정 확인)
             assignments = (
                 db.query(UserSystemAssignment)
                 .filter(
                     UserSystemAssignment.system_id == item.system_id,
                     UserSystemAssignment.item_id == item.item_id,
-                    UserSystemAssignment.environment == item.environment,
                 )
                 .all()
             )
@@ -180,15 +216,15 @@ def check_unchecked_items():
                 if user:
                     responsible_users.add(user)
 
-            # 시스템별로 그룹화 (환경 정보 포함)
+            # 시스템별로 그룹화 (환경 무관하게 항목명 기준 중복 제거)
             system = db.query(System).filter(System.system_id == item.system_id).first()
             if system:
                 system_name = system.system_name
-                env_key = f"{system_name} ({item.environment.upper()})"
-                if env_key not in system_items:
-                    system_items[env_key] = []
-                # 항목 이름만 저장 (담당자 정보 제외)
-                system_items[env_key].append(item.item_name.strip())
+                # 시스템명만 키로 사용 (환경 구분 없이, 같은 시스템 내에서 항목명 중복 제거)
+                if system_name not in system_items:
+                    system_items[system_name] = set()  # 중복 제거를 위해 set 사용
+                # 항목 이름만 저장 (담당자 정보 제외, 중복 제거)
+                system_items[system_name].add(item.item_name.strip())
 
         if not responsible_users:
             print(f"[스케줄러] 미체크 항목의 담당자가 없습니다.")
@@ -229,7 +265,7 @@ def check_unchecked_items():
                 db.query(User)
                 .filter(
                     ((User.position == "팀장") | (User.role == "팀장"))
-                    & user.user_email.isnot(None)
+                    & User.user_email.isnot(None)
                 )
                 .all()
             )
@@ -262,7 +298,7 @@ def check_unchecked_items():
                 .filter(
                     ((User.position == "본부장") | (User.role == "본부장"))
                     & (User.division.like("%DX%"))
-                    & user.user_email.isnot(None)
+                    & User.user_email.isnot(None)
                 )
                 .all()
             )
@@ -325,13 +361,15 @@ def check_unchecked_items():
                     <table style="width: 100%; border-collapse: collapse; margin-top: 10px; margin-bottom: 20px;">
                         <thead>
                             <tr style="background-color: #f5f5f5;">
-                                <th style="padding: 10px; text-align: left; border: 1px solid #ddd; font-size: 14px; font-weight: bold;">시스템 (환경)</th>
+                                <th style="padding: 10px; text-align: left; border: 1px solid #ddd; font-size: 14px; font-weight: bold;">시스템</th>
                                 <th style="padding: 10px; text-align: left; border: 1px solid #ddd; font-size: 14px; font-weight: bold;">항목</th>
                             </tr>
                         </thead>
                         <tbody>
             """
-        for system_name, items in system_items.items():
+        for system_name, items_set in system_items.items():
+            # set을 정렬된 리스트로 변환
+            items = sorted(list(items_set))
             for idx, item_name in enumerate(items):
                 if idx == 0:
                     # 첫 번째 항목: 시스템명과 항목명 모두 표시
@@ -415,16 +453,15 @@ def send_test_email_scheduled():
         else:
             # 미체크 항목의 담당자 수집
             responsible_users = set()
-            system_items = {}  # {system_name: [item_name, ...]}
+            system_items = {}  # {system_name: set(item_name, ...)} - 항목명 기준 중복 제거
 
             for item in unchecked_items:
-                # 해당 항목의 담당자 조회 (환경별로 필터링)
+                # 해당 항목의 담당자 조회 (환경 무관하게 배정 확인)
                 assignments = (
                     db.query(UserSystemAssignment)
                     .filter(
                         UserSystemAssignment.system_id == item.system_id,
                         UserSystemAssignment.item_id == item.item_id,
-                        UserSystemAssignment.environment == item.environment,
                     )
                     .all()
                 )
@@ -435,20 +472,15 @@ def send_test_email_scheduled():
                     if user:
                         responsible_users.add(user)
 
-                # 시스템별로 그룹화 (환경 정보 포함)
+                # 시스템별로 그룹화 (환경 무관하게 항목명 기준 중복 제거)
                 system = db.query(System).filter(System.system_id == item.system_id).first()
                 if system:
                     system_name = system.system_name
-                    env_key = f"{system_name} ({item.environment.upper()})"
-                    if env_key not in system_items:
-                        system_items[env_key] = []
-                    # 항목 이름만 저장 (담당자 정보 제외)
-                    system_items[env_key].append(item.item_name.strip())
-                    env_key = f"{system_name} ({item.environment.upper()})"
-                    if env_key not in system_items:
-                        system_items[env_key] = []
-                    # 항목 이름만 저장 (담당자 정보 제외)
-                    system_items[env_key].append(item.item_name.strip())
+                    # 시스템명만 키로 사용 (환경 구분 없이, 같은 시스템 내에서 항목명 중복 제거)
+                    if system_name not in system_items:
+                        system_items[system_name] = set()  # 중복 제거를 위해 set 사용
+                    # 항목 이름만 저장 (담당자 정보 제외, 중복 제거)
+                    system_items[system_name].add(item.item_name.strip())
 
         subject = f"[요청] 시스템 체크리스트 미점검 항목 확인 요청 ({today})"
 
@@ -487,7 +519,7 @@ def send_test_email_scheduled():
             db.query(User)
             .filter(
                 ((User.position == "팀장") | (User.role == "팀장"))
-                & user.user_email.isnot(None)
+                & User.user_email.isnot(None)
             )
             .all()
         )
@@ -518,7 +550,7 @@ def send_test_email_scheduled():
             .filter(
                 ((User.position == "본부장") | (User.role == "본부장"))
                 & (User.division.like("%DX%"))
-                & user.user_email.isnot(None)
+                & User.user_email.isnot(None)
             )
             .all()
         )
@@ -585,7 +617,9 @@ def send_test_email_scheduled():
                         <tbody>
             """
 
-        for system_name, items in system_items.items():
+        for system_name, items_set in system_items.items():
+            # set을 정렬된 리스트로 변환
+            items = sorted(list(items_set))
             for idx, item_name in enumerate(items):
                 if idx == 0:
                     # 첫 번째 항목: 시스템명과 항목명 모두 표시

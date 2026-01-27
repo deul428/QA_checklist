@@ -21,6 +21,14 @@
   max-width: 400px;
   box-shadow: $shadow-md;
   border: 1px solid rgba(236, 221, 200, 0.3);
+  margin: $spacing-md;
+
+  // 모바일
+  @media (max-width: 768px) {
+    padding: $spacing-md;
+    margin: $spacing-sm;
+    max-width: calc(100% - 2rem);
+  }
 
   h1 {
     text-align: center;
@@ -28,6 +36,11 @@
     margin-bottom: 10px;
     font-size: $font-size-xxl;
     font-weight: 700;
+
+    // 모바일
+    @media (max-width: 768px) {
+      font-size: $font-size-xl;
+    }
   }
 
   h2 {
@@ -36,6 +49,12 @@
     margin-bottom: $spacing-lg;
     font-size: $font-size-base;
     font-weight: normal;
+
+    // 모바일
+    @media (max-width: 768px) {
+      font-size: $font-size-sm;
+      margin-bottom: $spacing-md;
+    }
   }
 }
 

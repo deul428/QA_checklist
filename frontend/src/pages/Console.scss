@@ -3,16 +3,6 @@
 
 // Console page container styles are inherited from App.scss
 
-section {
-  border-top: 1px solid $border-color;
-  padding-top: $spacing-md;
-  margin-top: $spacing-md;
-  &:first-child {
-    border-top: none;
-    padding-top: 0;
-    margin-top: 0;
-  }
-}
 .toast {
   position: fixed;
   top: 20px;
@@ -34,22 +24,45 @@ section.btn-area {
   gap: $spacing-lg;
   width: 100%;
   justify-content: space-between;
+  flex-wrap: wrap;
+
+  // 태블릿
+  @media (max-width: 1024px) {
+    // flex-direction: column;
+    gap: $spacing-md; 
+  }
 
   .excel-export-section {
     display: flex;
     align-items: flex-end;
     flex-direction: row;
     gap: $spacing-sm;
+    flex-wrap: wrap;
+
+    // 모바일
+    @media (max-width: 768px) {
+      flex-direction: column;
+      align-items: stretch;
+      width: 100%;
+    }
+
     .date-range-selector {
       display: flex;
       flex-direction: column;
       gap: $spacing-xs;
+
+      // 모바일
+      @media (max-width: 768px) {
+        width: 100%;
+      }
+
       label {
         font-size: $font-size-xs;
         font-weight: 500;
       }
       span {
         font-size: $font-size-lg;
+        text-align: center;
       }
 
       .quick-date-buttons {
@@ -57,6 +70,11 @@ section.btn-area {
         width: 300px;
         grid-template-columns: repeat(4, 1fr);
         gap: 0.5rem;
+
+        // 모바일
+        @media (max-width: 768px) {
+          width: 100%;
+        }
 
         .btn-quick-date {
           cursor: pointer;
@@ -73,16 +91,33 @@ section.btn-area {
         gap: 0.25rem;
         width: 300px;
 
+        // 모바일
+        @media (max-width: 768px) {
+          width: 100%;
+          flex-direction: column;
+          align-items: stretch;
+        }
+
         .date-input {
           padding: $spacing-xs $spacing-xs;
           border: 1px solid $border-color;
           border-radius: 4px;
           font-size: $font-size-sm;
+
+          // 모바일
+          @media (max-width: 768px) {
+            width: 100%;
+          }
         }
       }
     }
     .btn.btn-success {
       height: 40px;
+
+      // 모바일
+      @media (max-width: 768px) {
+        width: 100%;
+      }
     }
   }
 
@@ -91,13 +126,32 @@ section.btn-area {
     flex-direction: column;
     gap: $spacing-sm;
     align-items: flex-end;
+
+    // 모바일
+    @media (max-width: 768px) {
+      width: 100%;
+      align-items: stretch;
+    }
+
     .email-send-form {
       .time-input-section {
         display: flex;
         gap: $spacing-xs;
         align-items: stretch;
+        flex-wrap: wrap;
+
+        // 모바일
+        @media (max-width: 768px) {
+          flex-direction: column;
+        }
+
         input {
           width: 160px;
+
+          // 모바일
+          @media (max-width: 768px) {
+            width: 100%;
+          }
         }
       }
     }
@@ -170,35 +224,162 @@ section.stats-section {
 }
 
 section.fail-items-section {
+  .section-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+    flex-wrap: wrap;
+    gap: 15px;
+
+    h2 {
+      margin: 0;
+    }
+
+    @media (max-width: 768px) {
+      flex-direction: column;
+      align-items: flex-start;
+    }
+  }
+
+  .filter-buttons {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+
+    .btn-filter {
+      padding: 8px 16px;
+      border: 1px solid $border-color;
+      background: white;
+      cursor: pointer;
+      transition: all 0.3s;
+      border-radius: 4px;
+      font-size: $font-size-sm;
+
+      &.active {
+        background: #007bff;
+        color: white;
+        border-color: #007bff;
+      }
+
+      &:hover {
+        background: #f0f0f0;
+
+        &.active {
+          background: #0056b3;
+        }
+      }
+
+      @media (max-width: 768px) {
+        padding: 6px 12px;
+        font-size: $font-size-xs;
+      }
+    }
+  }
+
+  .status-badge {
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 12px;
+    font-weight: bold;
+    display: inline-block;
+
+    &.status-pass {
+      background: #28a745;
+      color: white;
+    }
+
+    &.status-fail {
+      background: #dc3545;
+      color: white;
+    }
+
+    &.status-미점검 {
+      background: #ffc107;
+      color: #000;
+    }
+
+    @media (max-width: 768px) {
+      padding: 2px 6px;
+      font-size: 10px;
+    }
+  }
+
+  .fail-row {
+    background-color: #fff5f5;
+  }
+
+  .pass-row {
+    background-color: #f0fff4;
+  }
+
+  .unchecked-row {
+    background-color: #fffbf0;
+  }
+
   .table-wrapper {
     max-height: 330px;
     overflow-y: auto;
     border: 1px solid $border-color;
     border-radius: 4px;
     margin-top: $spacing-md;
+    overflow-x: auto;
+
+    // 모바일
+    @media (max-width: 768px) {
+      max-height: none;
+    }
   }
 
   .fail-items-table {
     width: 100%;
     border-collapse: collapse;
     font-size: $font-size-sm;
+    min-width: 800px;
+
+    th.sortable {
+      user-select: none;
+      position: relative;
+      
+      &:hover {
+        background-color: #f5f5f5;
+      }
+    }
+
+    // 모바일
+    @media (max-width: 768px) {
+      font-size: $font-size-xs;
+      min-width: 600px;
+    }
 
     th,
     td {
       padding: 0.7rem $spacing-xs;
-      min-width: 150px;
+      // min-width: 150px;
       max-width: 500px;
+
+      // 모바일
+      @media (max-width: 768px) {
+        padding: 0.5rem 0.25rem;
+        min-width: 100px;
+        max-width: 200px;
+      }
     }
     tr {
       border-collapse: unset;
       border-bottom: 1px solid #e0e0e0;
       width: 100%;
       display: grid;
-      grid-template-columns: 1fr 2fr repeat(5, 1fr);
+      grid-template-columns: 1fr 0.8fr 2fr 0.8fr 1.5fr 1.5fr 1.5fr 1.5fr;
       justify-items: stretch;
       justify-content: space-between;
       text-align: left;
       overflow-x: auto;
+
+      // 모바일
+      @media (max-width: 768px) {
+        grid-template-columns: 1fr 0.8fr 1.5fr 0.8fr 1.2fr 1.2fr 1.2fr 1.2fr;
+      }
     }
     thead {
       background-color: $accent-color;

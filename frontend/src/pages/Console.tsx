@@ -5,6 +5,7 @@ import {
   consoleAPI,
   ConsoleStats,
   ConsoleFailItem,
+  ConsoleAllItem,
   schedulerAPI,
 } from "../api/api";
 import "./Console.scss";
@@ -14,6 +15,10 @@ const Console: React.FC = () => {
   const navigate = useNavigate();
   const [stats, setStats] = useState<ConsoleStats | null>(null);
   const [failItems, setFailItems] = useState<ConsoleFailItem[]>([]);
+  const [allItems, setAllItems] = useState<ConsoleAllItem[]>([]);
+  const [filterStatus, setFilterStatus] = useState<"전체" | "FAIL" | "PASS" | "미점검">("전체");
+  const [sortBy, setSortBy] = useState<"system" | "item" | "fail_time" | "resolved_time" | null>(null);
+  const [sortOrder, setSortOrder] = useState<"asc" | "desc">("asc");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [testEmailTime, setTestEmailTime] = useState<string>("");
@@ -91,12 +96,12 @@ const Console: React.FC = () => {
     const fetchData = async () => {
       try {
         setLoading(true);
-        const [statsData, failItemsData] = await Promise.all([
+        const [statsData, allItemsData] = await Promise.all([
           consoleAPI.getStats(),
-          consoleAPI.getFailItems(),
+          consoleAPI.getAllItems(),
         ]);
         setStats(statsData);
-        setFailItems(failItemsData);
+        setAllItems(allItemsData);
       } catch (err: any) {
         if (err.response?.status === 403) {
           setError("console 페이지 접근 권한이 없습니다.");
@@ -243,6 +248,58 @@ const Console: React.FC = () => {
     });
   };
 
+  // 필터링 및 정렬된 항목 계산
+  const filteredItems = React.useMemo(() => {
+    let items = filterStatus === "전체" 
+      ? [...allItems] 
+      : allItems.filter(item => item.status === filterStatus);
+    
+    // 정렬 적용
+    if (sortBy) {
+      items.sort((a, b) => {
+        let aValue: any = null;
+        let bValue: any = null;
+        
+        switch (sortBy) {
+          case "system":
+            aValue = a.system_name;
+            bValue = b.system_name;
+            break;
+          case "item":
+            aValue = a.item_name;
+            bValue = b.item_name;
+            break;
+          case "fail_time":
+            aValue = a.fail_time ? new Date(a.fail_time).getTime() : 0;
+            bValue = b.fail_time ? new Date(b.fail_time).getTime() : 0;
+            break;
+          case "resolved_time":
+            aValue = a.resolved_time ? new Date(a.resolved_time).getTime() : 0;
+            bValue = b.resolved_time ? new Date(b.resolved_time).getTime() : 0;
+            break;
+        }
+        
+        if (aValue === null || aValue === undefined) return 1;
+        if (bValue === null || bValue === undefined) return -1;
+        
+        if (aValue < bValue) return sortOrder === "asc" ? -1 : 1;
+        if (aValue > bValue) return sortOrder === "asc" ? 1 : -1;
+        return 0;
+      });
+    }
+    
+    return items;
+  }, [allItems, filterStatus, sortBy, sortOrder]);
+  
+  const handleSort = (column: "system" | "item" | "fail_time" | "resolved_time") => {
+    if (sortBy === column) {
+      setSortOrder(sortOrder === "asc" ? "desc" : "asc");
+    } else {
+      setSortBy(column);
+      setSortOrder("asc");
+    }
+  };
+
   const totalCount = stats
     ? stats.pass_count + stats.fail_count + stats.unchecked_count
     : 0;
@@ -276,7 +333,7 @@ const Console: React.FC = () => {
           <h1>체크리스트 통계</h1>
           <div className="btn-set">
             <button
-              onClick={() => navigate("/admin")}
+              onClick={() => navigate("/list")}
               className="btn btn-success"
             >
               시스템/항목 관리
@@ -442,49 +499,105 @@ const Console: React.FC = () => {
           </div>
         </section>
 
-        {/* FAIL 항목 목록 */}
+        {/* 체크리스트 항목 목록 */}
         <section className="fail-items-section">
-          <h2>FAIL 항목 목록</h2>
-          {failItems.length === 0 ? (
-            <div className="no-data">오늘 FAIL로 처리된 항목이 없습니다.</div>
+          <div className="section-header">
+            <h2>체크리스트 항목 목록</h2>
+            <div className="filter-buttons">
+              <button
+                className={`btn btn-filter ${filterStatus === "전체" ? "active" : ""}`}
+                onClick={() => setFilterStatus("전체")}
+              >
+                전체
+              </button>
+              <button
+                className={`btn btn-filter ${filterStatus === "FAIL" ? "active" : ""}`}
+                onClick={() => setFilterStatus("FAIL")}
+              >
+                FAIL
+              </button>
+              <button
+                className={`btn btn-filter ${filterStatus === "PASS" ? "active" : ""}`}
+                onClick={() => setFilterStatus("PASS")}
+              >
+                PASS
+              </button>
+              <button
+                className={`btn btn-filter ${filterStatus === "미점검" ? "active" : ""}`}
+                onClick={() => setFilterStatus("미점검")}
+              >
+                미점검
+              </button>
+            </div>
+          </div>
+          {filteredItems.length === 0 ? (
+            <div className="no-data">
+              {filterStatus === "전체" 
+                ? "체크리스트 항목이 없습니다."
+                : `${filterStatus} 항목이 없습니다.`}
+            </div>
           ) : (
             <div className="table-wrapper">
               <table className="fail-items-table">
                 <thead>
                   <tr>
-                    <th>시스템</th>
-                    <th>항목</th>
-                    <th>담당자</th>
+                    <th 
+                      className="sortable" 
+                      onClick={() => handleSort("system")}
+                      style={{ cursor: "pointer" }}
+                    >
+                      시스템 {sortBy === "system" && (sortOrder === "asc" ? "↑" : "↓")}
+                    </th>
+                    <th>환경</th>
+                    <th 
+                      className="sortable" 
+                      onClick={() => handleSort("item")}
+                      style={{ cursor: "pointer" }}
+                    >
+                      항목 {sortBy === "item" && (sortOrder === "asc" ? "↑" : "↓")}
+                    </th>
+                    <th>상태</th>
+                    <th>체크 담당자</th>
                     <th>FAIL 사유</th>
-                    <th>FAIL 시간</th>
-                    <th>해결 상태</th>
-                    <th>해결 시간</th>
+                    <th 
+                      className="sortable" 
+                      onClick={() => handleSort("fail_time")}
+                      style={{ cursor: "pointer" }}
+                    >
+                      FAIL 시간 {sortBy === "fail_time" && (sortOrder === "asc" ? "↑" : "↓")}
+                    </th>
+                    <th 
+                      className="sortable" 
+                      onClick={() => handleSort("resolved_time")}
+                      style={{ cursor: "pointer" }}
+                    >
+                      해결 시간 {sortBy === "resolved_time" && (sortOrder === "asc" ? "↑" : "↓")}
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
-                  {failItems.map((item) => (
+                  {filteredItems.map((item) => (
                     <tr
-                      key={item.id}
-                      className={item.is_resolved ? "resolved" : ""}
+                      key={`${item.id}-${item.environment}`}
+                      className={
+                        item.status === "FAIL" && !item.is_resolved ? "fail-row" : 
+                        item.status === "FAIL" && item.is_resolved ? "resolved" :
+                        item.status === "PASS" ? "pass-row" : "unchecked-row"
+                      }
                     >
                       <td>{item.system_name}</td>
+                      <td>{item.environment.toUpperCase()}</td>
                       <td>{item.item_name}</td>
                       <td>
-                        {item.user_name} ({item.user_id})
+                        <span className={`status-badge status-${item.status.toLowerCase()}`}>
+                          {item.status}
+                        </span>
+                      </td>
+                      <td>
+                        {item.user_name ? `${item.user_name} (${item.user_id})` : "-"}
                       </td>
                       <td>{item.fail_notes || "-"}</td>
-                      <td>{formatDateTime(item.fail_time)}</td>
-                      <td>
-                        {item.is_resolved ? (
-                          <span className="btn status-badge resolved">
-                            해결됨
-                          </span>
-                        ) : (
-                          <span className="btn status-badge pending">
-                            미해결
-                          </span>
-                        )}
-                      </td>
+                      <td>{item.fail_time ? formatDateTime(item.fail_time) : "-"}</td>
                       <td>
                         {item.is_resolved && item.resolved_time
                           ? formatDateTime(item.resolved_time)

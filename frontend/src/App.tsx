@@ -11,7 +11,7 @@ import Dashboard from "./pages/Dashboard";
 import Checklist from "./pages/Checklist";
 import Console from "./pages/Console";
 import Substitute from "./pages/Substitute";
-import Admin from "./pages/Admin";
+import List from "./pages/List";
 import ProtectedRoute from "./components/ProtectedRoute";
 import "./App.scss";
 
@@ -61,10 +61,10 @@ function App() {
                 }
               />
               <Route
-                path="/admin"
+                path="/list"
                 element={
                   <ProtectedRoute>
-                    <Admin />
+                    <List />
                   </ProtectedRoute>
                 }
               />

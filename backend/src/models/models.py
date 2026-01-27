@@ -38,12 +38,14 @@ class CheckItem(Base):
     system_id = Column(Integer, ForeignKey("systems.system_id", ondelete="CASCADE"), nullable=False)
     item_name = Column(String(200), nullable=False)
     item_description = Column(Text)
+    environment = Column(String(10), nullable=False, default="prd")  # 'dev', 'stg', 'prd'
     status = Column(String(20), default="active", nullable=False)  # 'active' or 'deleted' (soft delete)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     
     __table_args__ = (
         CheckConstraint("status IN ('active', 'deleted')", name="check_item_status"),
-        UniqueConstraint("system_id", "item_name", name="uq_check_item_system_name"),
+        CheckConstraint("environment IN ('dev', 'stg', 'prd')", name="check_item_environment"),
+        UniqueConstraint("system_id", "item_name", "environment", name="uq_check_item_system_name_env"),
     )
 
 class UserSystemAssignment(Base):
@@ -53,12 +55,10 @@ class UserSystemAssignment(Base):
     user_id = Column(String(50), ForeignKey("users.user_id", ondelete="CASCADE"), nullable=False)
     system_id = Column(Integer, ForeignKey("systems.system_id", ondelete="CASCADE"), nullable=False)
     item_id = Column(Integer, ForeignKey("check_items.item_id", ondelete="CASCADE"), nullable=False)  # 체크 항목 ID (외래 키)
-    environment = Column(String(10), nullable=False, default="prd")  # 'dev', 'stg', 'prd'
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     
     __table_args__ = (
-        CheckConstraint("environment IN ('dev', 'stg', 'prd')", name="check_assignment_environment"),
-        UniqueConstraint("user_id", "system_id", "item_id", "environment", name="uq_user_system_assignment"),
+        UniqueConstraint("user_id", "system_id", "item_id", name="uq_user_system_assignment"),
     )
 
 class ChecklistRecord(Base):
@@ -142,6 +142,7 @@ class AdminLog(Base):
     action = Column(String(20), nullable=False)  # 'CREATE', 'UPDATE', 'DELETE'
     entity_type = Column(String(50), nullable=False)  # 'system', 'check_item', 'assignment'
     entity_id = Column(Integer, nullable=True)  # 대상 엔티티 ID (시스템 ID, 항목 ID, 배정 ID 등)
+    environment = Column(String(10), nullable=True)  # 'dev', 'stg', 'prd' (assignment 등 환경별 구분이 필요한 경우)
     old_data = Column(Text, nullable=True)  # 변경 전 데이터 (JSON 문자열)
     new_data = Column(Text, nullable=True)  # 변경 후 데이터 (JSON 문자열)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
@@ -149,6 +150,7 @@ class AdminLog(Base):
     __table_args__ = (
         CheckConstraint("action IN ('CREATE', 'UPDATE', 'DELETE')", name="admin_log_action"),
         CheckConstraint("entity_type IN ('system', 'check_item', 'assignment')", name="admin_log_entity_type"),
+        CheckConstraint("environment IN ('dev', 'stg', 'prd') OR environment IS NULL", name="admin_log_environment"),
     )
 
 # SpecialNote 모델은 더 이상 사용하지 않습니다.

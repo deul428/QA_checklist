@@ -1,12 +1,11 @@
 @import "../styles/variables";
 @import "../styles/mixins";
 
-.dashboard {
-}
+.dashboard {}
 
 // 헤더
-.dashboard-header {
-}
+.dashboard-header {}
+
 .user-info {
   display: flex;
   align-items: center;
@@ -47,6 +46,11 @@
       .form-control {
         @include input-base;
         width: 200px;
+
+        // 모바일
+        @media (max-width: 768px) {
+          width: 100%;
+        }
       }
 
       .form-text {
@@ -60,17 +64,39 @@
       display: flex;
       gap: $spacing-sm;
       align-items: center;
+      flex-wrap: wrap;
+
+      // 모바일
+      @media (max-width: 768px) {
+        width: 100%;
+        flex-direction: column;
+
+        button {
+          width: 100%;
+        }
+      }
     }
   }
 }
 
 // 대시보드 콘텐츠
 .dashboard-content {
+
   // 시스템 그리드
   .systems-grid {
     display: grid;
     grid-template-columns: repeat(4, 1fr);
     gap: $spacing-md;
+
+    // 태블릿
+    @media (max-width: 1024px) {
+      grid-template-columns: repeat(2, 1fr);
+    }
+
+    // 모바일
+    @media (max-width: 768px) {
+      grid-template-columns: 1fr;
+    }
   }
 
   // 시스템 카드
@@ -94,9 +120,11 @@
     &.checked {
       opacity: 0.8;
       border: 1px solid transparent;
-      h3 {
+
+      h4 {
         color: $text-secondary;
       }
+
       .system-description {
         color: $text-muted;
       }
@@ -111,25 +139,22 @@
       }
     }
 
-    h3 {
+    h4 {
       color: $primary-color;
       margin: 0 0 0.5rem 0;
     }
+
   }
 
   .system-description {
-    color: $text-secondary;
+    color: $text-muted;
     font-size: $font-size-sm;
-    margin-bottom: 15px;
+    margin-bottom: 1rem;
   }
 
   .system-action {
-    color: $primary-color;
     font-weight: 600;
     font-size: $font-size-sm;
 
-    &:hover {
-      color: $primary-hover;
-    }
   }
 }

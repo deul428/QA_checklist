@@ -22,6 +22,11 @@ from models.models import (
     SubstituteAssignmentLog,
     AdminLog,
 )
+from utils.checklist_helpers import (
+    create_or_update_checklist_record,
+    verify_checklist_consistency,
+    delete_checklist_record_with_log,
+)
 from services.schemas import (
     UserLogin,
     UserResponse,
@@ -33,10 +38,12 @@ from services.schemas import (
     TestEmailSchedule,
     ConsoleStatsResponse,
     ConsoleFailItemResponse,
+    ConsoleAllItemResponse,
     ExcelExportRequest,
     SubstituteAssignmentCreate,
     SubstituteAssignmentResponse,
     CheckItemCreate,
+    ConsistencyCheckResponse,
     CheckItemUpdate,
     AssignmentCreate,
 )
@@ -47,6 +54,7 @@ from services.auth import (
     get_current_user,
 )
 from services.scheduler import init_scheduler, get_korea_today
+import pytz
 
 load_dotenv()
 
@@ -489,26 +497,21 @@ async def get_check_items(
             detail="해당 시스템에 대한 접근 권한이 없습니다",
         )
 
+    # 시스템이 해당 환경을 지원하는지 확인
+    system = db.query(System).filter(System.system_id == system_id).first()
+    if system:
+        validate_environment_for_system(system, environment)
+    
     check_items = (
         db.query(CheckItem)
         .filter(
             CheckItem.system_id == system_id,
+            CheckItem.environment == environment,  # 환경 필터링 추가
             CheckItem.status == "active",  # 삭제된 항목 제외
         )
         .order_by(CheckItem.item_id)
         .all()
     )
-    
-    # 시스템이 해당 환경을 지원하는지 확인
-    system = db.query(System).filter(System.system_id == system_id).first()
-    if system:
-        # 시스템이 지원하지 않는 환경이면 빈 리스트 반환
-        if environment == "dev" and not system.has_dev:
-            check_items = []
-        elif environment == "stg" and not system.has_stg:
-            check_items = []
-        elif environment == "prd" and not system.has_prd:
-            check_items = []
 
     return check_items
 
@@ -521,7 +524,7 @@ async def get_today_checklist(
     """오늘 날짜의 체크리스트 기록 조회
 
     확인자가 여러 명인 경우, 한 명이 체크하면 다른 확인자들도 체크된 것으로 보임.
-    따라서 user_id 필터 없이 check_item_id와 check_date만으로 조회.
+    따라서 user_id 필터 없이 check_item_id, check_date, environment로 조회.
     """
     # 환경 유효성 검사
     if environment not in ["dev", "stg", "prd"]:
@@ -533,18 +536,17 @@ async def get_today_checklist(
     today = date.today()
 
     # 사용자가 담당하는 시스템의 체크 항목 ID 목록 (일반 담당자 + 활성화된 대체 담당자)
-    # 일반 담당자 시스템
+    # 일반 담당자 시스템 (환경 무관하게 배정 확인)
     assignments = (
         db.query(UserSystemAssignment)
         .filter(
             UserSystemAssignment.user_id == current_user.user_id,
-            UserSystemAssignment.environment == environment,
         )
         .all()
     )
     system_ids = {a.system_id for a in assignments}
 
-    # 활성화된 대체 담당자 시스템
+    # 활성화된 대체 담당자 시스템 (대체 담당자는 환경 구분 없이 모든 환경에 접근 가능)
     substitutes = (
         db.query(SubstituteAssignment)
         .filter(
@@ -555,18 +557,24 @@ async def get_today_checklist(
         .all()
     )
     system_ids.update({substitute.system_id for substitute in substitutes})
-
-    check_item_ids = [
-        item.item_id
-        for item in db.query(CheckItem)
-        .filter(
-            CheckItem.system_id.in_(system_ids),
-            CheckItem.status == "active",  # 삭제된 항목 제외
-        )
-        .all()
-    ]
+    
+    # 사용자가 담당하는 시스템의 체크 항목 ID 목록 (환경별로 필터링)
+    check_item_ids = []
+    if system_ids:
+        check_item_ids = [
+            item.item_id
+            for item in db.query(CheckItem)
+            .filter(
+                CheckItem.system_id.in_(system_ids),
+                CheckItem.environment == environment,  # 환경 필터링 추가
+                CheckItem.status == "active",  # 삭제된 항목 제외
+            )
+            .all()
+        ]
 
     # 오늘 날짜에 체크된 기록 조회 (다른 사람이 체크한 것도 포함)
+    # 주의: check_item_id와 environment를 모두 확인해야 함
+    # 같은 item_id라도 환경별로 다른 기록이 있을 수 있음
     records = (
         db.query(ChecklistRecord)
         .filter(
@@ -576,6 +584,11 @@ async def get_today_checklist(
         )
         .all()
     )
+
+    # 디버깅: 조회 결과 로그 (개발 환경에서만)
+    import os
+    if os.getenv("DEBUG", "false").lower() == "true":
+        print(f"[DEBUG] getTodayChecklist - environment: {environment}, system_ids: {system_ids}, check_item_ids: {check_item_ids}, records_count: {len(records)}")
 
     return records
 
@@ -620,63 +633,22 @@ async def submit_checklist(
         # 기존 기록 확인 및 업데이트 또는 생성
         # 확인자가 여러 명인 경우, 한 명이 체크하면 다른 사람도 체크된 것으로 보임.
         # 따라서 user_id 필터 없이 check_item_id, check_date, environment로 확인.
-        existing_record = (
-            db.query(ChecklistRecord)
-            .filter(
-                ChecklistRecord.check_item_id == item.check_item_id,
-                ChecklistRecord.check_date == today,
-                ChecklistRecord.environment == item_environment,
-            )
-            .first()
-        )
-
-        if existing_record:
-            # 기존 기록이 있으면 업데이트 (누가 체크했는지는 기록)
-            old_status = existing_record.status
-            existing_record.status = item.status
-            existing_record.fail_notes = item.fail_notes
-            existing_record.checked_at = datetime.now()
-            existing_record.system_id = check_item.system_id  # system_id 업데이트 (일관성 유지)
-            # 체크한 사람 정보도 업데이트 (같은 사람이 다시 체크한 경우)
-            existing_record.user_id = current_user.user_id
-
-            # 로그 기록 (UPDATE 액션)
-            log_entry = ChecklistRecordLog(
+        # 헬퍼 함수를 사용하여 기록과 로그를 일관성 있게 관리
+        try:
+            create_or_update_checklist_record(
+                db=db,
                 user_id=current_user.user_id,
                 check_item_id=item.check_item_id,
-                system_id=check_item.system_id,  # 시스템 ID 추가
-                check_date=today,
-                environment=item_environment,
-                status=item.status,
-                fail_notes=item.fail_notes,
-                action="UPDATE",
-            )
-            db.add(log_entry)
-        else:
-            # 새 기록 생성
-            new_record = ChecklistRecord(
-                user_id=current_user.user_id,
-                check_item_id=item.check_item_id,
-                system_id=check_item.system_id,  # 시스템 ID 추가
+                system_id=check_item.system_id,
                 check_date=today,
                 environment=item_environment,
                 status=item.status,
                 fail_notes=item.fail_notes,
             )
-            db.add(new_record)
-
-            # 로그 기록 (CREATE 액션)
-            log_entry = ChecklistRecordLog(
-                user_id=current_user.user_id,
-                check_item_id=item.check_item_id,
-                system_id=check_item.system_id,  # 시스템 ID 추가
-                check_date=today,
-                environment=item_environment,
-                status=item.status,
-                fail_notes=item.fail_notes,
-                action="CREATE",
-            )
-            db.add(log_entry)
+        except ValueError as e:
+            # 잘못된 파라미터가 전달된 경우 스킵
+            print(f"체크리스트 기록 생성/업데이트 실패: {e}")
+            continue
 
     db.commit()
     return {"message": "체크리스트가 성공적으로 저장되었습니다"}
@@ -881,6 +853,140 @@ async def get_console_fail_items(
     return result
 
 
+@app.get("/api/console/all-items", response_model=List[ConsoleAllItemResponse])
+async def get_console_all_items(
+    environment: Optional[str] = None,  # 'dev', 'stg', 'prd' 또는 None (모든 환경)
+    current_user: User = Depends(get_current_user), db: Session = Depends(get_db)
+):
+    """console 페이지 전체 체크리스트 항목 조회 (FAIL/PASS/미점검 모두 포함)"""
+    check_console_access(current_user)
+    
+    today = get_korea_today()
+    kst = pytz.timezone("Asia/Seoul")
+    
+    def to_kst(dt):
+        """datetime을 한국 시간대로 변환"""
+        if dt is None:
+            return None
+        # timezone 정보가 없으면 UTC로 간주하고 KST로 변환
+        if dt.tzinfo is None:
+            dt = pytz.UTC.localize(dt)
+        return dt.astimezone(kst)
+    
+    # 오늘 날짜의 모든 활성 체크 항목 조회
+    items_query = db.query(CheckItem).filter(CheckItem.status == "active")
+    if environment:
+        items_query = items_query.filter(CheckItem.environment == environment)
+    all_items = items_query.all()
+    
+    # 오늘 날짜의 모든 체크리스트 기록 조회
+    records_query = db.query(ChecklistRecord).filter(
+        ChecklistRecord.check_date == today
+    )
+    if environment:
+        records_query = records_query.filter(ChecklistRecord.environment == environment)
+    all_records = records_query.all()
+    
+    # (check_item_id, environment) 조합으로 기록 매핑
+    record_map = {}
+    for record in all_records:
+        key = (record.check_item_id, record.environment)
+        # 같은 키가 있으면 가장 최근 것으로 업데이트
+        if key not in record_map or record.checked_at > record_map[key].checked_at:
+            record_map[key] = record
+    
+    result = []
+    
+    for item in all_items:
+        key = (item.item_id, item.environment)
+        record = record_map.get(key)
+        
+        # 시스템 정보 조회
+        system = db.query(System).filter(System.system_id == item.system_id).first()
+        if not system:
+            continue
+        
+        # 상태 결정
+        if record:
+            status = record.status  # 'PASS' or 'FAIL'
+            fail_notes = None
+            fail_time = None
+            is_resolved = False
+            resolved_time = None
+            
+            # FAIL인 경우 해결 여부 확인 (로그에서 PASS로 변경된 기록이 있는지)
+            if record.status == 'FAIL':
+                fail_notes = record.fail_notes
+                fail_time = to_kst(record.checked_at)  # 한국 시간대로 변환
+                
+                later_pass_log = db.query(ChecklistRecordLog).filter(
+                    ChecklistRecordLog.check_item_id == item.item_id,
+                    ChecklistRecordLog.check_date == today,
+                    ChecklistRecordLog.environment == item.environment,
+                    ChecklistRecordLog.status == 'PASS',
+                    ChecklistRecordLog.created_at > record.checked_at
+                ).first()
+                
+                if later_pass_log:
+                    is_resolved = True
+                    resolved_time = to_kst(later_pass_log.created_at)  # 한국 시간대로 변환
+            # PASS인 경우, 이전에 FAIL이었다가 PASS로 변경된 경우 확인
+            elif record.status == 'PASS':
+                # 오늘 날짜의 로그에서 FAIL -> PASS 변경 확인
+                fail_log = db.query(ChecklistRecordLog).filter(
+                    ChecklistRecordLog.check_item_id == item.item_id,
+                    ChecklistRecordLog.check_date == today,
+                    ChecklistRecordLog.environment == item.environment,
+                    ChecklistRecordLog.status == 'FAIL',
+                    ChecklistRecordLog.created_at < record.checked_at
+                ).order_by(ChecklistRecordLog.created_at.desc()).first()
+                
+                if fail_log:
+                    # FAIL이 있었고, 그 이후 PASS로 변경되었으므로 해결된 것으로 간주
+                    # FAIL 사유와 시간을 유지
+                    fail_notes = fail_log.fail_notes
+                    fail_time = to_kst(fail_log.created_at)  # 한국 시간대로 변환
+                    is_resolved = True
+                    resolved_time = to_kst(record.checked_at)  # 한국 시간대로 변환
+            
+            # 체크한 사용자 정보
+            user = db.query(User).filter(User.user_id == record.user_id).first()
+            user_id = user.user_id if user else None
+            user_name = user.user_name if user else None
+        else:
+            status = "미점검"
+            fail_notes = None
+            fail_time = None
+            is_resolved = False
+            resolved_time = None
+            user_id = None
+            user_name = None
+        
+        result.append(
+            ConsoleAllItemResponse(
+                id=item.item_id,
+                system_id=item.system_id,
+                system_name=system.system_name,
+                check_item_id=item.item_id,
+                item_name=item.item_name,
+                environment=item.environment,
+                status=status,
+                fail_notes=fail_notes,
+                fail_time=fail_time,
+                user_id=user_id,
+                user_name=user_name,
+                is_resolved=is_resolved,
+                resolved_time=resolved_time,
+                checked_at=to_kst(record.checked_at) if record else None
+            )
+        )
+    
+    # 정렬: 시스템 ID, 환경, 항목명 순
+    result.sort(key=lambda x: (x.system_id, x.environment, x.item_name))
+    
+    return result
+
+
 @app.get("/api/checklist/unchecked", response_model=List[dict])
 async def get_unchecked_items(
     environment: Optional[str] = None,  # 'dev', 'stg', 'prd' 또는 None (모든 환경)
@@ -894,15 +1000,12 @@ async def get_unchecked_items(
     today = date.today()
 
     # 사용자가 담당하는 시스템의 모든 체크 항목 (일반 담당자 + 활성화된 대체 담당자)
-    # 일반 담당자 시스템
-    assignment_query = db.query(UserSystemAssignment).filter(
-        UserSystemAssignment.user_id == current_user.user_id
+    # 일반 담당자 시스템 (환경 무관하게 배정 확인)
+    assignments = (
+        db.query(UserSystemAssignment)
+        .filter(UserSystemAssignment.user_id == current_user.user_id)
+        .all()
     )
-    if environment:
-        assignment_query = assignment_query.filter(
-            UserSystemAssignment.environment == environment
-        )
-    assignments = assignment_query.all()
     system_ids = {a.system_id for a in assignments}
 
     # 활성화된 대체 담당자 시스템
@@ -917,6 +1020,7 @@ async def get_unchecked_items(
     )
     system_ids.update({substitute.system_id for substitute in substitutes})
 
+    # CheckItem은 이제 environment를 가지고 있으므로 필터링
     item_query = db.query(CheckItem).filter(
         CheckItem.system_id.in_(system_ids),
         CheckItem.status == "active",  # 삭제된 항목 제외
@@ -930,23 +1034,43 @@ async def get_unchecked_items(
     if environment:
         record_query = record_query.filter(ChecklistRecord.environment == environment)
     checked_records = record_query.all()
-    checked_item_ids = {(r.check_item_id, r.environment) for r in checked_records}
-
-    # 체크되지 않은 항목
-    unchecked_items = [
-        {
-            "check_item_id": item.item_id,
-            "item_name": item.item_name,
-            "system_id": item.system_id,
-            "environment": environment,  # 요청된 환경 사용
-            "system_name": db.query(System)
-            .filter(System.system_id == item.system_id)
-            .first()
-            .system_name,
-        }
-        for item in all_items
-        if (item.item_id, environment) not in checked_item_ids
-    ]
+    
+    # environment가 None이면 모든 환경을 고려, 아니면 특정 환경만 고려
+    if environment:
+        checked_item_ids = {(r.check_item_id, r.environment) for r in checked_records}
+        # 체크되지 않은 항목
+        unchecked_items = [
+            {
+                "check_item_id": item.item_id,
+                "item_name": item.item_name,
+                "system_id": item.system_id,
+                "environment": environment,
+                "system_name": db.query(System)
+                .filter(System.system_id == item.system_id)
+                .first()
+                .system_name,
+            }
+            for item in all_items
+            if (item.item_id, environment) not in checked_item_ids
+        ]
+    else:
+        # environment가 None이면 모든 환경에서 체크된 항목을 고려
+        checked_item_ids = {r.check_item_id for r in checked_records}
+        # 체크되지 않은 항목 (모든 환경에서 체크되지 않은 항목)
+        unchecked_items = [
+            {
+                "check_item_id": item.item_id,
+                "item_name": item.item_name,
+                "system_id": item.system_id,
+                "environment": None,
+                "system_name": db.query(System)
+                .filter(System.system_id == item.system_id)
+                .first()
+                .system_name,
+            }
+            for item in all_items
+            if item.item_id not in checked_item_ids
+        ]
 
     return unchecked_items
 
@@ -1010,10 +1134,18 @@ async def export_excel(
         system_map = {s.system_id: s.system_name for s in all_systems}
         item_map = {item.item_id: item for item in all_items}
 
-        # (system_id, item_id, environment) 조합으로 담당자 매핑 생성
+        # (system_id, item_name) 조합으로 담당자 매핑 생성 (환경 무관)
+        # 배정은 같은 system_id와 item_name을 가진 모든 항목에 대해 하나만 생성되므로
+        # item_id 대신 item_name을 사용하여 매핑
         assignment_map = {}
         for assignment in all_assignments:
-            key = (assignment.system_id, assignment.item_id, assignment.environment)
+            # assignment.item_id로 항목 정보 조회
+            check_item_for_assignment = item_map.get(assignment.item_id)
+            if not check_item_for_assignment:
+                continue
+            
+            # (system_id, item_name) 조합으로 키 생성
+            key = (assignment.system_id, check_item_for_assignment.item_name)
             if key not in assignment_map:
                 assignment_map[key] = set()  # 중복 제거를 위해 set 사용
             user = next((u for u in all_users if u.user_id == assignment.user_id), None)
@@ -1063,21 +1195,46 @@ async def export_excel(
                 if record.checked_at > records_dict[key].checked_at:
                     records_dict[key] = record
 
-        # 실제로 기록이 있는 날짜만 추출
-        dates_with_records = set()
-        for record in records:
-            dates_with_records.add(record.check_date)
+        # 날짜 범위 내의 모든 날짜 생성
+        date_list = []
+        current_date = request.start_date
+        while current_date <= request.end_date:
+            date_list.append(current_date)
+            current_date += timedelta(days=1)
 
-        # 날짜 범위 내의 모든 날짜 생성 (실제 기록이 있는 날짜만)
-        date_list = sorted(list(dates_with_records))
-
-        # 실제 기록이 있는 날짜에 대해서만 데이터 생성
-        # 각 항목에 대해 모든 환경(dev, stg, prd)에 대해 기록 확인
+        # 모든 항목에 대해 모든 날짜와 환경에 대해 데이터 생성 (체크된 항목 + 미점검 항목)
         excel_data = []
         environments = ["dev", "stg", "prd"]
         for check_item in all_items:
+            # 시스템이 해당 환경을 지원하는지 확인
+            system = system_map.get(check_item.system_id)
+            if not system:
+                continue
+            
+            # 시스템 정보 조회
+            system_obj = db.query(System).filter(System.system_id == check_item.system_id).first()
+            if not system_obj:
+                continue
+            
             for check_date in date_list:
                 for env in environments:
+                    # 시스템이 해당 환경을 지원하는지 확인
+                    env_supported = False
+                    if env == "dev" and system_obj.has_dev:
+                        env_supported = True
+                    elif env == "stg" and system_obj.has_stg:
+                        env_supported = True
+                    elif env == "prd" and system_obj.has_prd:
+                        env_supported = True
+                    
+                    # 항목의 환경과 일치하는지 확인
+                    if check_item.environment != env:
+                        continue
+                    
+                    # 시스템이 해당 환경을 지원하지 않으면 스킵
+                    if not env_supported:
+                        continue
+                    
                     key = (check_item.item_id, check_date, env)
                     if key in records_dict:
                         # 체크된 기록이 있는 경우
@@ -1093,7 +1250,19 @@ async def export_excel(
                                 "fail_notes": record.fail_notes or "",
                             }
                         )
-                    # 미점검 항목은 제외 (모든 환경에 대해 생성하면 너무 많아짐)
+                    else:
+                        # 미점검 항목
+                        excel_data.append(
+                            {
+                                "date": check_date,
+                                "system_id": check_item.system_id,
+                                "item_id": check_item.item_id,
+                                "item_name": check_item.item_name,
+                                "environment": env,
+                                "status": "미점검",
+                                "fail_notes": "",
+                            }
+                        )
 
         # 날짜, 시스템, 환경, 항목 순으로 정렬
         excel_data.sort(key=lambda x: (x["date"], x["system_id"], x["environment"], x["item_name"]))
@@ -1101,8 +1270,8 @@ async def export_excel(
         row_idx = 2
         for data in excel_data:
             system_name = system_map.get(data["system_id"], "")
-            # (system_id, item_id, environment) 조합으로 담당자 조회
-            assignment_key = (data["system_id"], data["item_id"], data["environment"])
+            # (system_id, item_name) 조합으로 담당자 조회 (환경 무관)
+            assignment_key = (data["system_id"], data["item_name"])
             responsible_users = ", ".join(assignment_map.get(assignment_key, []))
 
             ws.cell(
@@ -1343,21 +1512,30 @@ async def create_substitute_assignment(
             .all()
         )
 
+        # 항목명 기준으로 중복 제거 (환경이 다르지만 항목명이 동일한 경우 하나만 표시)
+        unique_items = {}
+        for item in check_items:
+            if item.item_name not in unique_items:
+                unique_items[item.item_name] = item
+        
+        # 중복 제거된 항목 리스트
+        unique_items_list = list(unique_items.values())
+
         # 메일 본문 생성
         items_table_rows = ""
-        if check_items:
+        if unique_items_list:
             # 첫 번째 항목 (시스템명 포함)
             items_table_rows += f"""
                         <tr>
-                            <td style="padding: 8px; border: 1px solid #ddd; font-size: 14px; font-weight: bold; vertical-align: top;" rowspan="{len(check_items)}">{system.system_name}</td>
-                            <td style="padding: 8px; border: 1px solid #ddd; font-size: 14px;">{check_items[0].item_name}</td>
+                            <td style="padding: 8px; border: 1px solid #ddd; font-size: 14px; font-weight: bold; vertical-align: top;" rowspan="{len(unique_items_list)}">{system.system_name}</td>
+                            <td style="padding: 8px; border: 1px solid #ddd; font-size: 14px;">{unique_items_list[0].item_name}</td>
                             <td style="padding: 8px; border: 1px solid #ddd; font-size: 14px; text-align: center;">{data.start_date.strftime('%Y-%m-%d')}</td>
                             <td style="padding: 8px; border: 1px solid #ddd; font-size: 14px; text-align: center;">{data.end_date.strftime('%Y-%m-%d')}</td>
                         </tr>
             """
 
             # 나머지 항목 추가
-            for item in check_items[1:]:
+            for item in unique_items_list[1:]:
                 items_table_rows += f"""
                         <tr>
                             <td style="padding: 8px; border: 1px solid #ddd; font-size: 14px;">{item.item_name}</td>
@@ -1620,8 +1798,13 @@ def log_admin_action(
     entity_id: Optional[int],
     old_data: Optional[dict] = None,
     new_data: Optional[dict] = None,
+    environment: Optional[str] = None,
 ):
-    """관리자 작업 로그 기록"""
+    """관리자 작업 로그 기록
+    
+    Args:
+        environment: 'dev', 'stg', 'prd' 또는 None (assignment 등 환경별 구분이 필요한 경우)
+    """
     import json
 
     admin_log = AdminLog(
@@ -1629,6 +1812,7 @@ def log_admin_action(
         action=action,
         entity_type=entity_type,
         entity_id=entity_id,
+        environment=environment,
         old_data=json.dumps(old_data, ensure_ascii=False) if old_data else None,
         new_data=json.dumps(new_data, ensure_ascii=False) if new_data else None,
     )
@@ -1636,7 +1820,7 @@ def log_admin_action(
     db.commit()
 
 
-@app.get("/api/admin/systems", response_model=List[SystemResponse])
+@app.get("/api/list/systems", response_model=List[SystemResponse])
 async def get_all_systems(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
@@ -1648,7 +1832,7 @@ async def get_all_systems(
     return systems
 
 
-@app.get("/api/admin/check-items", response_model=List[CheckItemResponse])
+@app.get("/api/list/check-items", response_model=List[CheckItemResponse])
 async def get_admin_check_items(
     system_id: Optional[int] = None,
     environment: Optional[str] = None,  # 'dev', 'stg', 'prd' 또는 None (모든 환경)
@@ -1658,23 +1842,35 @@ async def get_admin_check_items(
     """체크 항목 목록 조회 (관리자용, 삭제된 항목 포함)"""
     check_console_access(current_user)
 
+    # 환경 유효성 검사
+    if environment and environment not in ["dev", "stg", "prd"]:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="환경은 'dev', 'stg', 'prd' 중 하나여야 합니다.",
+        )
+
     query = db.query(CheckItem)
     if system_id:
         query = query.filter(CheckItem.system_id == system_id)
+    if environment:
+        query = query.filter(CheckItem.environment == environment)
 
-    items = query.order_by(CheckItem.system_id, CheckItem.item_id).all()
+    items = query.order_by(CheckItem.system_id, CheckItem.environment, CheckItem.item_id).all()
     
-    # environment 파라미터는 무시 (더 이상 사용하지 않음)
     return items
 
 
-@app.post("/api/admin/check-items", response_model=CheckItemResponse)
+@app.post("/api/list/check-items", response_model=List[CheckItemResponse])
 async def create_check_item(
     data: CheckItemCreate,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """체크 항목 추가 (관리자용)"""
+    """체크 항목 추가 (관리자용)
+    
+    apply_to_all_environments가 True이면 시스템이 지원하는 모든 환경에 항목을 생성합니다.
+    False이면 지정된 environment에만 항목을 생성합니다.
+    """
     check_console_access(current_user)
 
     # 시스템 존재 확인
@@ -1685,54 +1881,165 @@ async def create_check_item(
             detail="시스템을 찾을 수 없습니다.",
         )
 
-    # 중복 항목 확인 (같은 system_id, item_name 조합)
-    existing_item = db.query(CheckItem).filter(
-        CheckItem.system_id == data.system_id,
-        CheckItem.item_name == data.item_name
-    ).first()
-    
-    if existing_item:
+    # 환경 유효성 검사
+    if data.environment not in ["dev", "stg", "prd"]:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"이미 같은 이름의 항목이 존재합니다: '{data.item_name}'",
+            detail="환경은 'dev', 'stg', 'prd' 중 하나여야 합니다.",
         )
+
+    # 처리할 환경 목록 결정
+    if data.apply_to_all_environments:
+        # 시스템이 지원하는 모든 환경
+        target_environments = []
+        if system.has_dev:
+            target_environments.append("dev")
+        if system.has_stg:
+            target_environments.append("stg")
+        if system.has_prd:
+            target_environments.append("prd")
+        
+        if not target_environments:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="시스템이 지원하는 환경이 없습니다.",
+            )
+    else:
+        # 지정된 환경만
+        validate_environment_for_system(system, data.environment)
+        target_environments = [data.environment]
+
+    created_items = []
     
-    # 항목 생성 (environment 없이)
-    check_item = CheckItem(
-        system_id=data.system_id,
-        item_name=data.item_name,
-        item_description=data.item_description,
-        status="active",
-    )
-    db.add(check_item)
+    # 각 환경별로 항목 생성
+    for env in target_environments:
+        # 중복 항목 확인 (같은 system_id, item_name, environment 조합)
+        existing_item = db.query(CheckItem).filter(
+            CheckItem.system_id == data.system_id,
+            CheckItem.item_name == data.item_name,
+            CheckItem.environment == env
+        ).first()
+        
+        if existing_item:
+            # 일괄 처리 모드에서는 일부 환경에 이미 존재해도 계속 진행
+            if not data.apply_to_all_environments:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"이미 같은 이름의 항목이 {env} 환경에 존재합니다: '{data.item_name}'",
+                )
+            continue
+        
+        # 항목 생성
+        check_item = CheckItem(
+            system_id=data.system_id,
+            item_name=data.item_name,
+            item_description=data.item_description,
+            environment=env,
+            status="active",
+        )
+        db.add(check_item)
+        db.flush()  # item_id를 얻기 위해 flush
+        created_items.append(check_item)
+
     db.commit()
-    db.refresh(check_item)
+    
+    # 생성된 항목들을 refresh
+    for item in created_items:
+        db.refresh(item)
+
+    # 담당자 배정 (user_ids가 제공된 경우)
+    # 같은 system_id와 item_name을 가진 모든 항목에 대해 하나의 배정만 생성
+    created_assignments = []
+    if data.user_ids and len(data.user_ids) > 0 and created_items:
+        # 첫 번째 생성된 항목의 item_id를 사용 (같은 system_id와 item_name을 가진 모든 항목에 대해 하나의 배정만 생성)
+        first_item = created_items[0]
+        
+        # 같은 system_id와 item_name을 가진 모든 항목의 item_id 목록 (모든 환경 포함)
+        same_name_item_ids = [
+            item.item_id for item in created_items
+            if item.system_id == data.system_id and item.item_name == data.item_name
+        ]
+        
+        for user_id in data.user_ids:
+            # 사용자 존재 확인
+            user = db.query(User).filter(User.user_id == user_id).first()
+            if not user:
+                continue
+
+            # 중복 확인: 같은 system_id와 item_name을 가진 모든 항목에 대해 이미 배정이 있는지 확인
+            existing = (
+                db.query(UserSystemAssignment)
+                .filter(
+                    UserSystemAssignment.user_id == user_id,
+                    UserSystemAssignment.system_id == data.system_id,
+                    UserSystemAssignment.item_id.in_(same_name_item_ids),
+                )
+                .first()
+            )
+
+            if existing:
+                continue
+
+            # 배정 생성: 첫 번째 항목의 item_id만 사용 (같은 system_id와 item_name을 가진 모든 항목에 대해 하나의 배정만 생성)
+            assignment = UserSystemAssignment(
+                user_id=user_id,
+                system_id=data.system_id,
+                item_id=first_item.item_id,
+            )
+            db.add(assignment)
+            created_assignments.append(assignment)
+
+        db.commit()
+
+        # 배정 로그 기록
+        for assignment in created_assignments:
+            log_admin_action(
+                db=db,
+                admin_user_id=current_user.user_id,
+                action="CREATE",
+                entity_type="assignment",
+                entity_id=assignment.id,
+                environment=None,  # 환경 무관하게 배정
+                new_data={
+                    "user_id": assignment.user_id,
+                    "system_id": assignment.system_id,
+                    "item_id": assignment.item_id,
+                },
+            )
 
     # 관리자 작업 로그 기록
-    log_admin_action(
-        db=db,
-        admin_user_id=current_user.user_id,
-        action="CREATE",
-        entity_type="check_item",
-        entity_id=check_item.item_id,
-        new_data={
-            "system_id": check_item.system_id,
-            "item_name": check_item.item_name,
-            "item_description": check_item.item_description,
-        },
-    )
+    for check_item in created_items:
+        log_admin_action(
+            db=db,
+            admin_user_id=current_user.user_id,
+            action="CREATE",
+            entity_type="check_item",
+            entity_id=check_item.item_id,
+            environment=check_item.environment,
+            new_data={
+                "system_id": check_item.system_id,
+                "item_name": check_item.item_name,
+                "item_description": check_item.item_description,
+                "environment": check_item.environment,
+                "assigned_users": data.user_ids if data.user_ids else [],
+            },
+        )
 
-    return check_item
+    return created_items
 
 
-@app.put("/api/admin/check-items/{item_id}", response_model=CheckItemResponse)
+@app.put("/api/list/check-items/{item_id}", response_model=List[CheckItemResponse])
 async def update_check_item(
     item_id: int,
     data: CheckItemUpdate,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """체크 항목 수정 (관리자용)"""
+    """체크 항목 수정 (관리자용)
+    
+    apply_to_all_environments가 True이면 같은 system_id, item_name을 가진 모든 환경의 항목을 수정합니다.
+    False이면 지정된 item_id의 항목만 수정합니다.
+    """
     check_console_access(current_user)
 
     check_item = db.query(CheckItem).filter(CheckItem.item_id == item_id).first()
@@ -1742,61 +2049,98 @@ async def update_check_item(
             detail="체크 항목을 찾을 수 없습니다.",
         )
 
-    # 변경 전 데이터 저장
-    old_data = {
-        "system_id": check_item.system_id,
-        "item_name": check_item.item_name,
-        "item_description": check_item.item_description,
-        "status": check_item.status,
-    }
+    # 시스템 정보 조회
+    system = db.query(System).filter(System.system_id == check_item.system_id).first()
+    if not system:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="시스템을 찾을 수 없습니다.",
+        )
 
-    # 데이터 업데이트
-    if data.item_name is not None:
-        check_item.item_name = data.item_name
-    # item_description은 None이 아니면 업데이트 (빈 문자열도 명시적으로 업데이트)
-    # Pydantic에서 Optional 필드에 빈 문자열을 보내면 빈 문자열로 처리됨
-    if data.item_description is not None:
-        check_item.item_description = data.item_description
-    if data.status is not None:
-        if data.status not in ["active", "deleted"]:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="status는 'active' 또는 'deleted'만 가능합니다.",
-            )
-        check_item.status = data.status
+    # 수정할 항목 목록 결정
+    if data.apply_to_all_environments:
+        # 같은 system_id, item_name을 가진 모든 환경의 항목
+        items_to_update = db.query(CheckItem).filter(
+            CheckItem.system_id == check_item.system_id,
+            CheckItem.item_name == check_item.item_name
+        ).all()
+    else:
+        # 지정된 item_id의 항목만
+        items_to_update = [check_item]
+
+    updated_items = []
+    items_old_data = {}  # {item_id: old_data}
+    
+    # 각 항목 업데이트
+    for item in items_to_update:
+        # 변경 전 데이터 저장
+        old_data = {
+            "system_id": item.system_id,
+            "item_name": item.item_name,
+            "item_description": item.item_description,
+            "environment": item.environment,
+            "status": item.status,
+        }
+        items_old_data[item.item_id] = old_data
+
+        # 데이터 업데이트
+        if data.item_name is not None:
+            item.item_name = data.item_name
+        # item_description은 None이 아니면 업데이트 (빈 문자열도 명시적으로 업데이트)
+        if data.item_description is not None:
+            item.item_description = data.item_description
+        if data.status is not None:
+            if data.status not in ["active", "deleted"]:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="status는 'active' 또는 'deleted'만 가능합니다.",
+                )
+            item.status = data.status
+
+        updated_items.append(item)
 
     db.commit()
-    db.refresh(check_item)
-
-    # 변경 후 데이터 저장
-    new_data = {
-        "system_id": check_item.system_id,
-        "item_name": check_item.item_name,
-        "item_description": check_item.item_description,
-        "status": check_item.status,
-    }
+    
+    # 변경된 항목들을 refresh
+    for item in updated_items:
+        db.refresh(item)
 
     # 관리자 작업 로그 기록
-    log_admin_action(
-        db=db,
-        admin_user_id=current_user.user_id,
-        action="UPDATE",
-        entity_type="check_item",
-        entity_id=check_item.item_id,
-        old_data=old_data,
-        new_data=new_data,
-    )
+    for item in updated_items:
+        new_data = {
+            "system_id": item.system_id,
+            "item_name": item.item_name,
+            "item_description": item.item_description,
+            "environment": item.environment,
+            "status": item.status,
+        }
+        
+        log_admin_action(
+            db=db,
+            admin_user_id=current_user.user_id,
+            action="UPDATE",
+            entity_type="check_item",
+            entity_id=item.item_id,
+            environment=item.environment,
+            old_data=items_old_data.get(item.item_id),
+            new_data=new_data,
+        )
 
-    return check_item
+    return updated_items
 
 
-@app.delete("/api/admin/check-items/{item_id}")
+@app.delete("/api/list/check-items/{item_id}")
 async def delete_check_item(
     item_id: int,
+    apply_to_all_environments: bool = False,  # 일괄 삭제 여부
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """체크 항목 삭제 (관리자용, soft delete)"""
+    """체크 항목 삭제 (관리자용, soft delete)
+    
+    apply_to_all_environments가 True이면 같은 system_id, item_name을 가진 모든 환경의 항목을 삭제합니다.
+    False이면 지정된 item_id의 항목만 삭제합니다.
+    """
     check_console_access(current_user)
 
     check_item = db.query(CheckItem).filter(CheckItem.item_id == item_id).first()
@@ -1806,47 +2150,73 @@ async def delete_check_item(
             detail="체크 항목을 찾을 수 없습니다.",
         )
 
-    if check_item.status == "deleted":
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="이미 삭제된 항목입니다.",
-        )
+    # 삭제할 항목 목록 결정
+    if apply_to_all_environments:
+        # 같은 system_id, item_name을 가진 모든 환경의 항목
+        items_to_delete = db.query(CheckItem).filter(
+            CheckItem.system_id == check_item.system_id,
+            CheckItem.item_name == check_item.item_name
+        ).all()
+    else:
+        # 지정된 item_id의 항목만
+        items_to_delete = [check_item]
 
-    # 변경 전 데이터 저장
-    old_data = {
-        "system_id": check_item.system_id,
-        "item_name": check_item.item_name,
-        "item_description": check_item.item_description,
-        "status": check_item.status,
-    }
+    deleted_items = []
+    
+    # 각 항목 삭제 (soft delete)
+    for item in items_to_delete:
+        if item.status == "deleted":
+            continue  # 이미 삭제된 항목은 건너뜀
 
-    # Soft delete (status를 'deleted'로 변경)
-    check_item.status = "deleted"
+        # 변경 전 데이터 저장
+        old_data = {
+            "system_id": item.system_id,
+            "item_name": item.item_name,
+            "item_description": item.item_description,
+            "environment": item.environment,
+            "status": item.status,
+        }
+
+        item.status = "deleted"
+        deleted_items.append((item, old_data))
+
     db.commit()
-
-    # 변경 후 데이터 저장
-    new_data = {
-        "system_id": check_item.system_id,
-        "item_name": check_item.item_name,
-        "item_description": check_item.item_description,
-        "status": "deleted",
-    }
+    
+    # 변경된 항목들을 refresh
+    for item, _ in deleted_items:
+        db.refresh(item)
 
     # 관리자 작업 로그 기록
-    log_admin_action(
-        db=db,
-        admin_user_id=current_user.user_id,
-        action="DELETE",
-        entity_type="check_item",
-        entity_id=check_item.item_id,
-        old_data=old_data,
-        new_data=new_data,
-    )
+    for item, old_data in deleted_items:
+        new_data = {
+            "system_id": item.system_id,
+            "item_name": item.item_name,
+            "item_description": item.item_description,
+            "environment": item.environment,
+            "status": item.status,
+        }
+        
+        log_admin_action(
+            db=db,
+            admin_user_id=current_user.user_id,
+            action="DELETE",
+            entity_type="check_item",
+            entity_id=item.item_id,
+            environment=item.environment,
+            old_data=old_data,
+            new_data=new_data,
+        )
 
-    return {"message": "체크 항목이 삭제되었습니다."}
+    deleted_count = len(deleted_items)
+    if deleted_count == 0:
+        return {"message": "삭제할 항목이 없습니다."}
+    elif deleted_count == 1:
+        return {"message": "체크 항목이 삭제되었습니다."}
+    else:
+        return {"message": f"{deleted_count}개의 체크 항목이 삭제되었습니다."}
 
 
-@app.get("/api/admin/users", response_model=List[UserResponse])
+@app.get("/api/list/users", response_model=List[UserResponse])
 async def get_all_users(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
@@ -1858,7 +2228,7 @@ async def get_all_users(
     return users
 
 
-@app.post("/api/admin/assignments")
+@app.post("/api/list/assignments")
 async def create_assignments(
     data: AssignmentCreate,
     current_user: User = Depends(get_current_user),
@@ -1888,19 +2258,30 @@ async def create_assignments(
             detail="시스템 ID가 일치하지 않습니다.",
         )
     
-    # 환경 유효성 검사
-    assignment_environment = getattr(data, "environment", "prd")
-    if assignment_environment not in ["dev", "stg", "prd"]:
+    # 환경 무관하게 배정: 같은 system_id와 item_name을 가진 모든 항목에 대해 하나의 배정만 생성
+    # 같은 system_id와 item_name을 가진 모든 항목의 item_id 목록 조회
+    same_name_items = (
+        db.query(CheckItem)
+        .filter(
+            CheckItem.system_id == check_item.system_id,
+            CheckItem.item_name == check_item.item_name,
+            CheckItem.status == "active"
+        )
+        .all()
+    )
+    
+    if not same_name_items:
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="환경은 'dev', 'stg', 'prd' 중 하나여야 합니다.",
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="같은 이름의 항목을 찾을 수 없습니다.",
         )
     
-    # 시스템의 환경 존재 여부 검증 (데이터 무결성 보장)
-    system = db.query(System).filter(System.system_id == check_item.system_id).first()
-    if system:
-        validate_environment_for_system(system, assignment_environment)
-
+    # 같은 system_id와 item_name을 가진 모든 항목의 item_id 목록
+    same_name_item_ids = [item.item_id for item in same_name_items]
+    
+    # 첫 번째 항목의 item_id를 사용 (같은 system_id와 item_name을 가진 모든 항목에 대해 하나의 배정만 생성)
+    target_item_id = same_name_items[0].item_id
+    
     created_assignments = []
     for user_id in data.user_ids:
         # 사용자 확인
@@ -1908,14 +2289,13 @@ async def create_assignments(
         if not user:
             continue
 
-        # 중복 확인
+        # 중복 확인: 같은 system_id와 item_name을 가진 모든 항목에 대해 이미 배정이 있는지 확인
         existing = (
             db.query(UserSystemAssignment)
             .filter(
                 UserSystemAssignment.user_id == user_id,
                 UserSystemAssignment.system_id == data.system_id,
-                UserSystemAssignment.item_id == data.check_item_id,
-                UserSystemAssignment.environment == assignment_environment,
+                UserSystemAssignment.item_id.in_(same_name_item_ids),
             )
             .first()
         )
@@ -1923,12 +2303,11 @@ async def create_assignments(
         if existing:
             continue
 
-        # 배정 생성
+        # 배정 생성: 첫 번째 항목의 item_id만 사용 (같은 system_id와 item_name을 가진 모든 항목에 대해 하나의 배정만 생성)
         assignment = UserSystemAssignment(
             user_id=user_id,
             system_id=data.system_id,
-            item_id=data.check_item_id,
-            environment=assignment_environment,
+            item_id=target_item_id,
         )
         db.add(assignment)
         created_assignments.append(assignment)
@@ -1943,11 +2322,11 @@ async def create_assignments(
             action="CREATE",
             entity_type="assignment",
             entity_id=assignment.id,
+            environment=None,  # 환경 무관하게 배정
             new_data={
                 "user_id": assignment.user_id,
                 "system_id": assignment.system_id,
                 "item_id": assignment.item_id,
-                "environment": assignment.environment,
             },
         )
 
@@ -1957,7 +2336,7 @@ async def create_assignments(
     }
 
 
-@app.delete("/api/admin/assignments/{assignment_id}")
+@app.delete("/api/list/assignments/{assignment_id}")
 async def delete_assignment(
     assignment_id: int,
     current_user: User = Depends(get_current_user),
@@ -1995,13 +2374,14 @@ async def delete_assignment(
         action="DELETE",
         entity_type="assignment",
         entity_id=assignment_id,
+        environment=None,  # 환경 무관하게 배정
         old_data=old_data,
     )
 
     return {"message": "담당자 배정이 삭제되었습니다."}
 
 
-@app.get("/api/admin/assignments")
+@app.get("/api/list/assignments")
 async def get_assignments(
     system_id: Optional[int] = None,
     check_item_id: Optional[int] = None,
@@ -2017,11 +2397,10 @@ async def get_assignments(
         query = query.filter(UserSystemAssignment.system_id == system_id)
     if check_item_id:
         query = query.filter(UserSystemAssignment.item_id == check_item_id)
-    if environment:
-        query = query.filter(UserSystemAssignment.environment == environment)
+    # environment 필터 제거 (환경 무관하게 배정)
 
     assignments = query.order_by(
-        UserSystemAssignment.system_id, UserSystemAssignment.environment, UserSystemAssignment.item_id
+        UserSystemAssignment.system_id, UserSystemAssignment.item_id
     ).all()
 
     result = []
@@ -2038,12 +2417,105 @@ async def get_assignments(
                 "system_name": system.system_name if system else "",
                 "item_id": assignment.item_id,
                 "item_name": check_item.item_name if check_item else "",
-                "environment": assignment.environment,
                 "created_at": assignment.created_at,
             }
         )
 
     return result
+
+
+@app.get("/api/list/checklist/consistency-check")
+async def check_checklist_consistency(
+    check_date: Optional[date] = None,
+    environment: Optional[str] = None,
+    check_item_id: Optional[int] = None,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """체크리스트 기록과 로그 간의 일관성 검증 (관리자용)
+    
+    checklist_records와 checklist_records_logs 간의
+    일관성을 검증하여 데이터 무결성 문제를 발견합니다.
+    
+    Args:
+        check_date: 검증할 날짜 (None이면 오늘)
+        environment: 검증할 환경 ('dev', 'stg', 'prd', None이면 모든 환경)
+        check_item_id: 검증할 항목 ID (None이면 모든 항목)
+    """
+    check_console_access(current_user)
+    
+    if check_date is None:
+        check_date = date.today()
+    
+    # 환경 유효성 검사
+    if environment and environment not in ["dev", "stg", "prd"]:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="환경은 'dev', 'stg', 'prd' 중 하나여야 합니다.",
+        )
+    
+    # 검증할 항목 목록 결정
+    if check_item_id:
+        check_items = db.query(CheckItem).filter(CheckItem.item_id == check_item_id).all()
+    else:
+        check_items = db.query(CheckItem).filter(CheckItem.status == "active").all()
+    
+    # 검증할 환경 목록 결정
+    environments = [environment] if environment else ["dev", "stg", "prd"]
+    
+    results = []
+    inconsistent_count = 0
+    
+    for check_item in check_items:
+        for env in environments:
+            # 시스템이 해당 환경을 지원하는지 확인
+            system = db.query(System).filter(System.system_id == check_item.system_id).first()
+            if not system:
+                continue
+            
+            # 환경 지원 여부 확인
+            env_supported = False
+            if env == "dev" and system.has_dev:
+                env_supported = True
+            elif env == "stg" and system.has_stg:
+                env_supported = True
+            elif env == "prd" and system.has_prd:
+                env_supported = True
+            
+            if not env_supported:
+                continue
+            
+            # 일관성 검증
+            verification = verify_checklist_consistency(
+                db=db,
+                check_item_id=check_item.item_id,
+                check_date=check_date,
+                environment=env,
+            )
+            
+            if not verification["is_consistent"]:
+                inconsistent_count += 1
+            
+            results.append({
+                "check_item_id": check_item.item_id,
+                "item_name": check_item.item_name,
+                "system_id": check_item.system_id,
+                "check_date": check_date.isoformat(),
+                "environment": env,
+                "is_consistent": verification["is_consistent"],
+                "record_exists": verification["record"] is not None,
+                "latest_log_exists": verification["latest_log"] is not None,
+                "latest_log_action": verification["latest_log"].action if verification["latest_log"] else None,
+                "issues": verification["issues"],
+            })
+    
+    return {
+        "check_date": check_date.isoformat(),
+        "environment": environment or "all",
+        "total_checked": len(results),
+        "inconsistent_count": inconsistent_count,
+        "results": results,
+    }
 
 
 if __name__ == "__main__":

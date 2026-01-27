@@ -46,6 +46,7 @@ class CheckItemResponse(BaseModel):
     system_id: int
     item_name: str
     item_description: Optional[str] = None
+    environment: str = "prd"  # 'dev', 'stg', 'prd'
     status: str = "active"  # 'active' or 'deleted'
 
     class Config:
@@ -56,19 +57,22 @@ class CheckItemCreate(BaseModel):
     system_id: int
     item_name: str
     item_description: Optional[str] = None
+    environment: str = "prd"  # 'dev', 'stg', 'prd' (필수)
+    apply_to_all_environments: Optional[bool] = False  # 일괄 처리 여부
+    user_ids: Optional[List[str]] = None  # 담당자 ID 목록 (항목 생성 시 함께 배정)
 
 
 class CheckItemUpdate(BaseModel):
     item_name: Optional[str] = None
     item_description: Optional[str] = None
     status: Optional[str] = None
+    apply_to_all_environments: Optional[bool] = False  # 일괄 처리 여부
 
 
 class AssignmentCreate(BaseModel):
     system_id: int
     check_item_id: int
     user_ids: List[str]  # 여러 명의 담당자 배정 가능 (user_id 리스트)
-    environment: str = "prd"  # 'dev', 'stg', 'prd'
 
 
 class CheckItemSubmit(BaseModel):
@@ -124,6 +128,23 @@ class ConsoleFailItemResponse(BaseModel):
     resolved_time: Optional[datetime] = None
 
 
+class ConsoleAllItemResponse(BaseModel):
+    id: int
+    system_id: int
+    system_name: str
+    check_item_id: int
+    item_name: str
+    environment: str = "prd"
+    status: str  # 'PASS', 'FAIL', '미점검'
+    fail_notes: Optional[str] = None
+    fail_time: Optional[datetime] = None
+    user_id: Optional[str] = None
+    user_name: Optional[str] = None
+    is_resolved: bool
+    resolved_time: Optional[datetime] = None
+    checked_at: Optional[datetime] = None
+
+
 class ExcelExportRequest(BaseModel):
     start_date: date
     end_date: date
@@ -153,3 +174,20 @@ class SubstituteAssignmentResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+class ConsistencyIssueResponse(BaseModel):
+    """일관성 검증 결과 이슈"""
+    issue: str
+
+
+class ConsistencyCheckResponse(BaseModel):
+    """일관성 검증 결과"""
+    check_item_id: int
+    check_date: date
+    environment: str
+    is_consistent: bool
+    record_exists: bool
+    latest_log_exists: bool
+    latest_log_action: Optional[str] = None
+    issues: List[str]

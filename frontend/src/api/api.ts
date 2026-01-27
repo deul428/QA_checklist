@@ -104,12 +104,15 @@ export interface CheckItem {
   system_id: number;
   item_name: string;
   item_description?: string;
+  environment: string; // 'dev', 'stg', 'prd'
+  status: "active" | "deleted"; // 'active' or 'deleted'
 }
 
 export interface ChecklistRecord {
   records_id: number;
   user_id: string;
   check_item_id: number;  // API 응답은 check_item_id를 반환함
+  system_id?: number;  // 시스템 ID (denormalized)
   check_date: string;
   environment: string; // 'dev', 'stg', 'prd'
   status: "PASS" | "FAIL";
@@ -234,6 +237,23 @@ export interface ConsoleFailItem {
   resolved_time?: string;
 }
 
+export interface ConsoleAllItem {
+  id: number;
+  system_id: number;
+  system_name: string;
+  check_item_id: number;
+  item_name: string;
+  environment: string;
+  status: "PASS" | "FAIL" | "미점검";
+  fail_notes?: string;
+  fail_time?: string;
+  user_id?: string;
+  user_name?: string;
+  is_resolved: boolean;
+  resolved_time?: string;
+  checked_at?: string;
+}
+
 export interface ExcelExportRequest {
   start_date: string; // YYYY-MM-DD
   end_date: string; // YYYY-MM-DD
@@ -250,6 +270,11 @@ export const consoleAPI = {
     const response = await api.get("/api/console/fail-items", { params });
     return response.data;
   },
+  getAllItems: async (environment?: string): Promise<ConsoleAllItem[]> => {
+    const params = environment ? { environment } : {};
+    const response = await api.get("/api/console/all-items", { params });
+    return response.data;
+  },
   exportExcel: async (request: ExcelExportRequest): Promise<Blob> => {
     const response = await api.post("/api/console/export-excel", request, {
       responseType: "blob",
@@ -258,23 +283,21 @@ export const consoleAPI = {
   },
 };
 
-export interface CheckItem {
-  id: number;
-  system_id: number;
-  item_name: string;
-  item_description?: string;
-  status: "active" | "deleted";
-}
 
 export interface CheckItemCreate {
   system_id: number;
   item_name: string;
   item_description?: string;
+  environment: string; // 'dev', 'stg', 'prd' (필수)
+  apply_to_all_environments?: boolean; // 일괄 처리 여부
+  user_ids?: string[]; // 담당자 ID 목록 (항목 생성 시 함께 배정)
 }
 
 export interface CheckItemUpdate {
   item_name?: string;
   item_description?: string;
+  status?: string;
+  apply_to_all_environments?: boolean; // 일괄 처리 여부
 }
 
 export interface Assignment {
@@ -284,7 +307,6 @@ export interface Assignment {
   system_id: number;
   system_name: string;
   item_name: string;
-  environment: string; // 'dev', 'stg', 'prd'
   created_at: string;
 }
 
@@ -292,7 +314,6 @@ export interface AssignmentCreate {
   system_id: number;
   check_item_id: number;
   user_ids: string[];
-  environment: string; // 'dev', 'stg', 'prd'
 }
 
 export interface SubstituteAssignment {
@@ -316,56 +337,57 @@ export interface SubstituteAssignmentCreate {
   end_date: string; // YYYY-MM-DD
 }
 
-export const adminAPI = {
+export const listAPI = {
   getSystems: async (): Promise<System[]> => {
-    const response = await api.get("/api/admin/systems");
+    const response = await api.get("/api/list/systems");
     return response.data;
   },
   getCheckItems: async (systemId?: number, environment?: string): Promise<CheckItem[]> => {
     const params: any = {};
     if (systemId) params.system_id = systemId;
     if (environment) params.environment = environment;
-    const response = await api.get("/api/admin/check-items", { params });
+    const response = await api.get("/api/list/check-items", { params });
     return response.data;
   },
-  createCheckItem: async (data: CheckItemCreate): Promise<CheckItem> => {
-    const response = await api.post("/api/admin/check-items", data);
+  createCheckItem: async (data: CheckItemCreate): Promise<CheckItem[]> => {
+    const response = await api.post("/api/list/check-items", data);
     return response.data;
   },
   updateCheckItem: async (
     itemId: number,
     data: CheckItemUpdate
-  ): Promise<CheckItem> => {
-    const response = await api.put(`/api/admin/check-items/${itemId}`, data);
+  ): Promise<CheckItem[]> => {
+    const response = await api.put(`/api/list/check-items/${itemId}`, data);
     return response.data;
   },
-  deleteCheckItem: async (itemId: number): Promise<void> => {
-    await api.delete(`/api/admin/check-items/${itemId}`);
+  deleteCheckItem: async (itemId: number, applyToAllEnvironments: boolean = false): Promise<void> => {
+    await api.delete(`/api/list/check-items/${itemId}`, {
+      params: { apply_to_all_environments: applyToAllEnvironments },
+    });
   },
   getUsers: async (): Promise<User[]> => {
-    const response = await api.get("/api/admin/users");
+    const response = await api.get("/api/list/users");
     return response.data;
   },
   getAssignments: async (
     systemId?: number,
-    checkItemId?: number,
-    environment?: string
+    checkItemId?: number
   ): Promise<Assignment[]> => {
     const params: any = {};
     if (systemId) params.system_id = systemId;
     if (checkItemId) params.check_item_id = checkItemId;
-    if (environment) params.environment = environment;
-    const response = await api.get("/api/admin/assignments", { params });
+    // environment 파라미터 제거 (환경 무관하게 배정)
+    const response = await api.get("/api/list/assignments", { params });
     return response.data;
   },
   createAssignments: async (
     data: AssignmentCreate
   ): Promise<{ message: string; created_count: number }> => {
-    const response = await api.post("/api/admin/assignments", data);
+    const response = await api.post("/api/list/assignments", data);
     return response.data;
   },
   deleteAssignment: async (assignmentId: number): Promise<void> => {
-    await api.delete(`/api/admin/assignments/${assignmentId}`);
+    await api.delete(`/api/list/assignments/${assignmentId}`);
   },
 };
 

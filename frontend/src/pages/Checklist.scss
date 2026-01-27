@@ -74,7 +74,6 @@
     gap: $spacing-sm;
 
     h4 {
-      color: $text-primary;
       white-space: pre-wrap;
       margin: 0;
     }
@@ -144,8 +143,115 @@
   padding-bottom: 1rem;
 }
 
+// 환경 선택 탭
+.environment-tabs {
+  .btn {
+    transition: all 0.2s ease;
+    
+    &.active { 
+      
+      &.btn-primary {
+        background-color: $primary-hover !important;
+        border-color: $primary-hover !important;
+      }
+      
+      &.btn-danger {
+        background-color: $danger-hover !important;
+        border-color: $danger-hover !important;
+      }
+      
+      &.btn-warning {
+        background-color: $warning-hover !important;
+        border-color: $warning-hover !important;
+      }
+    }
+  }
+}
+
 // 제출 섹션
 .submit-section {
   padding-top: $spacing-md;
   text-align: center;
+}
+
+// 반응형 스타일
+@media (max-width: 1024px) {
+  .check-item {
+    .check-item-header {
+      width: 35%;
+    }
+
+    .item-description {
+      width: 35%;
+    }
+  }
+}
+
+@media (max-width: 768px) {
+  .toast {
+    top: 10px;
+    right: 10px;
+    left: 10px;
+    min-width: auto;
+    max-width: none;
+  }
+
+  .checklist-header {
+    h1 {
+      font-size: $font-size-lg;
+    }
+  }
+
+  .check-item {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: $spacing-sm;
+    padding-bottom: $spacing-md;
+
+    .check-item-header {
+      width: 100%;
+      flex-direction: column;
+      align-items: flex-start;
+      gap: $spacing-xs;
+    }
+
+    .item-description {
+      width: 100%;
+      margin: $spacing-xs 0;
+    }
+
+    .check-item-actions {
+      width: 100%;
+
+      .status-buttons {
+        width: 100%;
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: $spacing-xs;
+
+        .status-btn {
+          padding: 0.75rem 1rem;
+          font-size: $font-size-sm;
+        }
+      }
+    }
+  }
+
+  .environment-tabs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: $spacing-xs;
+
+    .btn {
+      flex: 1;
+      min-width: calc(33.333% - 0.5rem);
+      font-size: $font-size-sm;
+      padding: 0.5rem 0.75rem;
+    }
+  }
+
+  .notes-input {
+    width: 100%;
+    margin-top: $spacing-sm;
+  }
 }
